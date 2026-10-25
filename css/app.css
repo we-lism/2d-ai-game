@@ -371,3 +371,10 @@ details.qa pre { background: color-mix(in srgb, var(--accent) 7%, transparent); 
 .room-card .kv { gap: 8px; }
 #od-msg { white-space: pre-line; }
 .room-card .kv > span:first-child { margin-right: 10px; color: var(--muted); }
+.post-box { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 12px 0 4px; }
+.post-box h4 { margin: 0 0 8px; font-size: 13px; }
+.post-box h4 small { font-weight: 500; margin-left: 6px; }
+.post-grid { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px 10px; align-items: center; font-size: 13px; }
+.post-grid label { color: var(--muted); }
+.post-grid select { width: 100%; }
+.exec-pick { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-top: 8px; font-size: 13px; }

@@ -121,6 +121,7 @@ export class EmployeeDialog extends Modal {
     this.off = store.on("change", () => this.render());
     this.onClose = () => this.off();
     this.body.addEventListener("click", (e) => this.click(e));
+    this.body.addEventListener("change", (e) => this.change(e));
     this.render();
   }
   where() {
@@ -183,6 +184,7 @@ export class EmployeeDialog extends Modal {
           <small>누적 ${p.total_points || 0}점 · 평가 ${perf.count}건${perf.avg != null ? ` · 평균 ${perf.avg}점` : ""}</small>
         </div></div>`}
       </div>
+      ${p.role === "ceo" ? "" : this.postBox(p)}
       <div class="tabs" role="tablist">
         <button role="tab" type="button" aria-selected="${this.tab === "now"}" data-tab="now">진행 중 업무 ${now.length}</button>
         <button role="tab" type="button" aria-selected="${this.tab === "hist"}" data-tab="hist">업무 이력 ${history.length}</button>
@@ -190,8 +192,62 @@ export class EmployeeDialog extends Modal {
       <div class="stack">${(this.tab === "now" ? now : history).map((h) => this.row(h)).join("") || `<p class="empty-note">${this.tab === "now" ? "지금 진행 중인 업무가 없습니다." + (this.store.isTeamMember(p) ? " 2층에서 쉬며 팀장 호출을 기다립니다." : "") : "아직 업무 이력이 없습니다."}</p>`}</div>`;
     PersonSprite.portrait(this.body.querySelector("canvas"), p.look, { ceo: p.role === "ceo" });
   }
+  /** 소속 · 직책: team membership and post (head of a unit, 비서실장, 담당 임원). 직급 stays points-only. */
+  postBox(p) {
+    const org = this.store.org;
+    const led = org.ledBy(p);
+    const cur = p.role === "secretary" ? "sec" : led.length ? "head:" + led[0].id : (p.oversees || []).length ? "exec" : "none";
+    const others = (u) => org.people.filter((x) => x.unit_id === u.id && x.role === "staff" && x.id !== p.id && x.id !== u.head_id).length;
+    const can = (u) => u.type === "team" ? others(u) >= 2 : org.rule(u).ok;
+    const why = (u) => u.type === "team" ? `팀원 ${others(u)}/2명` : org.rule(u).text;
+    const opt = (v, label, dis = false) => `<option value="${v}" ${cur === v ? "selected" : ""} ${dis && cur !== v ? "disabled" : ""}>${esc(label)}</option>`;
+    const order = ["dept", "section", "team"];
+    const heads = [...org.units].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type))
+      .map((u) => opt("head:" + u.id, `${org.path(u)} ${UNIT_TYPES[u.type].head}${can(u) ? "" : ` (불가 · ${why(u)})`}${u.head_id && u.head_id !== p.id ? ` · 현재 ${org.person(u.head_id)?.name || ""}` : ""}`, !can(u)));
+    const depts = org.ofType("dept");
+    return `<section class="post-box">
+      <h4>소속 · 직책 <small class="muted">직급(${esc(p.rank)})은 평가 점수로만 오릅니다</small></h4>
+      <div class="post-grid">
+        <label for="emp-unit">소속 팀</label>
+        <select id="emp-unit"><option value="">소속 없음</option>${org.ofType("team").map((u) => `<option value="${u.id}" ${p.unit_id === u.id ? "selected" : ""}>${esc(org.path(u))}</option>`).join("")}</select>
+        <label for="emp-post">직책</label>
+        <select id="emp-post">${opt("none", p.unit_id ? "팀원 (직책 없음)" : "직책 없음")}${heads.join("")}${opt("sec", `비서실장${org.secretary && org.secretary.id !== p.id ? ` · 현재 ${org.secretary.name}` : ""}`)}${depts.length ? opt("exec", "담당 임원 (부 1~4개)") : ""}</select>
+      </div>
+      ${cur === "exec" || this.wantExec ? `<div class="exec-pick">${depts.map((d) => `<label><input type="checkbox" class="emp-dept" value="${d.id}" ${(p.oversees || []).map(Number).includes(d.id) ? "checked" : ""}> ${esc(d.name)}</label>`).join("")}
+        <button type="button" class="btn small primary" data-exec>임원 임명</button></div>` : ""}
+      ${org.ofType("team").length ? "" : `<p class="hint">팀이 없습니다. 방 이름표를 누르거나 조직 탭에서 팀을 먼저 만드세요.</p>`}
+    </section>`;
+  }
+  async post(fn, ok) {
+    try {
+      const r = await fn();
+      if (r && r.ok === false && r.reason === "RULE") { this.store.emit("toast", `규칙을 아직 채우지 못했습니다 (${r.have}/${r.need}).`); }
+      else this.store.emit("toast", ok);
+      this.wantExec = false; await this.store.refresh(false);
+    } catch (err) { this.store.emit("toast", err.friendly || err.message); this.render(); }
+  }
+  async change(e) {
+    const api = this.store.api, id = this.personId, p = this.store.person(id); if (!p) return;
+    if (e.target.id === "emp-unit") {
+      const unit = e.target.value ? +e.target.value : null;
+      return this.post(async () => { if (p.role === "secretary") await api.dismiss(id); return api.setMember(id, unit); }, unit ? "소속 팀을 바꿨습니다." : "소속을 비웠습니다.");
+    }
+    if (e.target.id === "emp-post") {
+      const v = e.target.value;
+      if (v === "exec") { this.wantExec = true; this.render(); return; }
+      if (v === "none") return this.post(() => api.dismiss(id), "직책을 해제했습니다.");
+      if (v === "sec") return this.post(() => api.setSecretary(id), `${p.name} 님을 비서실장으로 임명했습니다.`);
+      if (v.startsWith("head:")) return this.post(async () => { if (p.role === "secretary") await api.dismiss(id); return api.appoint(id, +v.slice(5)); }, "임명했습니다.");
+    }
+  }
   async click(e) {
     const t = e.target.closest("[data-tab]"); if (t) { this.tab = t.dataset.tab; this.render(); return; }
+    if (e.target.closest("[data-exec]")) {
+      const depts = [...this.body.querySelectorAll(".emp-dept:checked")].map((c) => +c.value);
+      if (depts.length < 1 || depts.length > 4) { this.store.emit("toast", "담당할 부를 1~4개 고르세요."); return; }
+      const p = this.store.person(this.personId);
+      return this.post(async () => { if (p?.role === "secretary") await this.store.api.dismiss(this.personId); return this.store.api.setExecutive(this.personId, depts); }, "담당 임원으로 임명했습니다.");
+    }
     if (e.target.closest("[data-limit]")) {
       const v = +this.body.querySelector("#emp-limit").value;
       try { await this.store.api.setLimit(this.personId, v ? Math.max(1000, Math.round(v)) : null); await this.store.refresh(false); this.store.emit("toast", "하루 한도를 저장했습니다."); }
