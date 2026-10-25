@@ -102,7 +102,7 @@ export class TaskDirector {
     if (mine.length) {
       this.log(`${ur.unit_name} 팀장 ${head.name} → 팀원 ${mine.length}명 호출`);
       this.script(head, [Act.wait(3000, "팀원 호출 중"), Act.wait(4000, "진행 관리", () => this.urStatus(ins.id, ur.id) !== "working", 300000)]);
-    } else {
+    } else if (!(ins.assignments || []).some((a) => a.unit_report_id === ur.id && a.character_id === head.id)) {
       this.script(head, [Act.wait(4000, "하위 조직 보고 대기", () => this.urStatus(ins.id, ur.id) !== "working", 300000)]);
     }
   }

@@ -3,6 +3,8 @@ import { esc, show, fmtTime } from "../util/dom.js";
 import { PersonSprite } from "../render/PersonSprite.js";
 import { CandidateFactory, HAIR_STYLES, EYE_STYLES } from "../model/Look.js";
 import { Building } from "../model/Layout.js";
+import { nextRank } from "../model/Organization.js";
+import { scoreButtons, handleScoreClick } from "./Score.js";
 
 const STATUS = { queued: "비서 전달 중", assigning: "업무 분배 회의", working: "수행 중", reporting: "팀장 취합 중", done: "보고 완료", error: "오류" };
 const skinName = (hex) => ["아주 밝은", "밝은", "중간", "구릿빛", "갈색", "짙은"][["#f6d7bd", "#eec39f", "#dcaa80", "#c48a5e", "#9a6640", "#6e4528"].indexOf(hex)] || "";
@@ -29,7 +31,7 @@ export class HireDialog extends Modal {
       <dt>이름</dt><dd>${esc(c.name)}</dd><dt>성별</dt><dd>${c.gender}</dd>
       <dt>피부색</dt><dd><i class="sw" style="background:${c.look.skin}"></i>${skinName(c.look.skin)}</dd>
       <dt>얼굴</dt><dd>${HAIR_STYLES[c.look.hairStyle]} · ${EYE_STYLES[c.look.eyes]}</dd>
-      <dt>MBTI</dt><dd>${c.mbti}</dd><dt>성실함</dt><dd><span class="mono">0%</span> <small class="muted">오늘 AI 사용량 ÷ 하루 한도 ${this.store.limitOf({}).toLocaleString()} 토큰</small></dd>`;
+      <dt>MBTI</dt><dd>${c.mbti}</dd><dt>직급</dt><dd>사원 <small class="muted">0 / 100점 → 주임</small></dd><dt>성실함</dt><dd><span class="mono">0%</span> <small class="muted">오늘 AI 사용량 ÷ 하루 한도 ${this.store.limitOf({}).toLocaleString()} 토큰</small></dd>`;
   }
   async hire() {
     const btn = this.foot.querySelector("[data-hire]"); btn.disabled = true;
@@ -135,10 +137,7 @@ export class EmployeeDialog extends Modal {
         <header><span class="pill ${a.status === "done" ? "done" : a.status === "error" ? "error" : "working"}">${W_LABEL[a.status]}</span><small>${fmtTime(h.at)}</small></header>
         <div class="rep-task"><b>맡은 일</b> ${esc(a.task)}</div><div class="sub">대표 지시: ${esc(ins.content)}</div>
         ${a.result ? `<details class="sum"><summary>결과 보기</summary><pre>${esc(a.result)}</pre></details>` : ""}
-        ${a.result && a.status === "done" ? `<div class="verdict" role="group" aria-label="평가">
-          <button type="button" class="btn small ${a.verdict === "adopted" ? "primary" : ""}" data-v="adopted" data-a="${a.id}">채택</button>
-          <button type="button" class="btn small ${a.verdict === "held" ? "danger" : ""}" data-v="held" data-a="${a.id}">보류</button>
-          ${a.verdict ? `<button type="button" class="btn small" data-v="" data-a="${a.id}">평가 취소</button>` : ""}</div>` : ""}
+        ${a.result && a.status === "done" ? scoreButtons("work", a.id, a.score) : ""}
       </article>`;
     }
     const u = h.u;
@@ -147,6 +146,7 @@ export class EmployeeDialog extends Modal {
       <div class="rep-task"><b>받은 일</b> ${esc(u.task)}</div>
       ${u.plan_note ? `<div class="sub">업무 틀: ${esc(u.plan_note)}</div>` : ""}
       ${u.summary ? `<details class="sum"><summary>올린 보고서 보기</summary><pre>${esc(u.summary)}</pre></details>` : ""}
+      ${u.summary && u.status === "done" && u.plan_note !== "직접 수행" ? scoreButtons("report", u.id, u.score) : ""}
     </article>`;
   }
   render() {
@@ -154,7 +154,7 @@ export class EmployeeDialog extends Modal {
     const org = this.store.org; const perf = this.store.performance(p);
     const history = this.store.historyOf(p); const now = this.store.currentOf(p);
     const u = this.store.usage(p); const desk = this.store.deskOf(p);
-    const boss = (() => { const t = org.unit(p.unit_id); if (!t) return null; if (t.head_id && t.head_id !== p.id) return org.person(t.head_id); const parent = t.parent_id ? org.unit(t.parent_id) : null; return parent ? org.head(parent) : null; })();
+    const boss = (() => { const t = org.unit(p.unit_id); if (!t) return null; if (t.head_id && t.head_id !== p.id) return org.person(t.head_id); const parent = t.parent_id ? org.unit(t.parent_id) : null; return (parent ? org.head(parent) : null) || (!t.head_id ? org.secretary : null); })();
     this.title = `${p.name} · ${org.title(p)}`;
     const barCls = u.rate >= 100 ? "full" : u.rate >= 80 ? "warn" : "";
     this.body.innerHTML = `<div class="emp-head">
@@ -166,14 +166,20 @@ export class EmployeeDialog extends Modal {
           ${boss ? `<div class="kv"><span>보고 대상</span><b>${esc(boss.name)} ${esc(boss.rank)}</b></div>` : ""}
           ${(p.oversees || []).length ? `<div class="kv"><span>담당 부</span><b>${esc(p.oversees.map((id) => org.unit(+id)?.name).filter(Boolean).join(", "))}</b> <small class="muted">→ 비서실에 보고</small></div>` : ""}
         </div>
-        ${p.role === "ceo" ? "" : `<div class="perf">
+        ${p.role === "ceo" ? "" : `<div class="perf-col"><div class="perf">
           <div class="label">성실함 (오늘 AI 사용률)</div>
           <div class="perf-num mono">${u.rate}%</div>
           <div class="bar ${barCls}"><b style="width:${Math.min(100, u.rate)}%"></b></div>
           <small>${u.used.toLocaleString()} / ${u.limit.toLocaleString()} 토큰${u.rate >= 100 ? " · 오늘 한도 소진" : ""}</small>
           <div class="kv"><input id="emp-limit" type="number" min="1000" step="1000" value="${p.daily_limit || ""}" placeholder="한도 ${this.store.defaultLimit.toLocaleString()}" class="num-in" aria-label="하루 한도"><button type="button" class="btn small" data-limit>한도 저장</button></div>
-          <small>업무 성과(채택률) ${perf.rate == null ? "–" : perf.rate + "%"} · 채택 ${perf.adopted} · 보류 ${perf.held}</small>
-        </div>`}
+        </div>
+        <div class="perf">
+          <div class="label">직급 · 승진 점수</div>
+          ${(() => { const nx = nextRank(p.rank); return nx ? `<div class="perf-num">${esc(p.rank)} <small class="mono">${p.points} / ${nx.need}점</small></div>
+          <div class="bar"><b style="width:${Math.min(100, (p.points / nx.need) * 100)}%"></b></div><small>${nx.need - p.points}점 더 받으면 ${nx.rank} 승진</small>`
+          : `<div class="perf-num">${esc(p.rank)}</div><small>최고 직급입니다</small>`; })()}
+          <small>누적 ${p.total_points || 0}점 · 평가 ${perf.count}건${perf.avg != null ? ` · 평균 ${perf.avg}점` : ""}</small>
+        </div></div>`}
       </div>
       <div class="tabs" role="tablist">
         <button role="tab" type="button" aria-selected="${this.tab === "now"}" data-tab="now">진행 중 업무 ${now.length}</button>
@@ -190,10 +196,7 @@ export class EmployeeDialog extends Modal {
       catch (err) { this.store.emit("toast", err.friendly || err.message); }
       return;
     }
-    const b = e.target.closest("[data-a]"); if (!b) return;
-    b.disabled = true;
-    try { await this.store.api.verdict(+b.dataset.a, b.dataset.v || null); await this.store.refresh(false); }
-    catch (err) { this.store.emit("toast", err.friendly || err.message); b.disabled = false; }
+    await handleScoreClick(e, this.store);
   }
 }
 

@@ -206,6 +206,8 @@ export class DefaultLayouts {
       }
       default: break; // 3F–7F: empty floor plate, ready to be designed
     }
+    rooms.forEach((r, i) => (r.id = `f${floor}-r${i}`));
+    items.forEach((it, i) => (it.id = `f${floor}-i${i}`));
     return new FloorLayout(floor, { rooms, items });
   }
 }

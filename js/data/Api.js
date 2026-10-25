@@ -116,5 +116,5 @@ export class Api {
   setLimit(charId, limit) { return this.call("set_limit", { p_char: charId, p_limit: limit }); }
   setGoogleToken(token) { return this.call("set_google_token", { p_token: token }); }
   testCalendar() { return this.call("test_calendar"); }
-  verdict(assignmentId, verdict) { return this.call("verdict", { p_assignment: assignmentId, p_verdict: verdict }); }
+  score(kind, id, score) { return this.call("score", { p_kind: kind, p_id: id, p_score: score }); }
 }

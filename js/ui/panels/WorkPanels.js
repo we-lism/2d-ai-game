@@ -1,9 +1,11 @@
 import { esc, show, fmtTime } from "../../util/dom.js";
+import { scoreButtons, handleScoreClick } from "../Score.js";
 
 const STATUS = { queued: "비서실 전달 중", assigning: "업무 틀 작성", working: "수행 중", reporting: "보고 취합 중", done: "보고 완료", error: "오류" };
 const ENGINE = { openai: "ChatGPT", gemini: "Gemini" };
 
 const TYPE = { dept: "부", section: "과", team: "팀" };
+const UNIT_HEAD = { dept: "부서장", section: "과 책임자", team: "팀장" };
 
 /** 지시: 대표가 담당 조직(부·과·팀)을 고르면 비서실이 그 조직장에게 전달합니다. */
 export class OrderPanel {
@@ -25,8 +27,8 @@ export class OrderPanel {
   }
   render() {
     const org = this.store.org; const keep = this.sel.value;
-    const units = org.units.filter((u) => u.head_id).sort((a, b) => ["dept", "section", "team"].indexOf(a.type) - ["dept", "section", "team"].indexOf(b.type));
-    this.sel.innerHTML = units.length ? units.map((u) => `<option value="${u.id}">[${TYPE[u.type]}] ${esc(org.path(u))} · ${esc(org.head(u)?.name || "")} ${esc(org.head(u)?.rank || "")}</option>`).join("") : `<option value="">장이 임명된 조직이 없습니다</option>`;
+    const units = org.orderable.sort((a, b) => ["dept", "section", "team"].indexOf(a.type) - ["dept", "section", "team"].indexOf(b.type));
+    this.sel.innerHTML = units.length ? units.map((u) => `<option value="${u.id}">[${TYPE[u.type]}] ${esc(org.path(u))} · ${u.head_id ? esc(org.head(u)?.name || "") + " " + esc(UNIT_HEAD[u.type]) : "1인 팀"}</option>`).join("") : `<option value="">지시를 받을 조직이 없습니다</option>`;
     if (keep && units.some((u) => String(u.id) === keep)) this.sel.value = keep;
     this.root.querySelector("#od-btn").disabled = !units.length;
     this.preview();
@@ -35,15 +37,17 @@ export class OrderPanel {
   chain(u, depth = 0) {
     const org = this.store.org; const head = org.head(u);
     const kids = org.children(u).filter((c) => c.head_id);
-    const line = `${"  ".repeat(depth)}${TYPE[u.type]} ${u.name}: ${head ? head.name + " " + head.rank : "공석"}${u.type === "team" ? ` (팀원 ${org.members(u).length}명)` : ""}`;
+    const solo = !head && u.type === "team" ? org.people.find((x) => x.unit_id === u.id && x.role === "staff") : null;
+    const line = `${"  ".repeat(depth)}${TYPE[u.type]} ${u.name}: ${head ? `${head.name} ${head.rank}(${UNIT_HEAD[u.type]})` : solo ? `${solo.name} ${solo.rank} 혼자 수행 → 비서실에 직접 보고` : "공석"}${u.type === "team" && head ? ` · 팀원 ${org.members(u).length}명` : ""}`;
     return [line, ...kids.map((k) => this.chain(k, depth + 1))].join("\n");
   }
   preview() {
     const org = this.store.org; const u = org.unit(+this.sel.value);
     const box = this.root.querySelector("#od-role");
-    if (!u) { box.textContent = "조직 탭에서 조직을 만들고 장을 임명하면 지시를 내릴 수 있습니다."; return; }
+    if (!u) { box.textContent = "조직 탭에서 팀을 만들고 직원을 넣으세요. 1명뿐인 팀은 그 직원이 직접 맡고, 2명 이상이면 팀장을 임명해야 합니다."; return; }
     const sec = org.secretary;
-    box.textContent = `전달 경로: 사장 → 비서실(${sec ? sec.name : "공석·AI 대행"}) →\n${this.chain(u)}\n기본 업무: ${u.role_text?.trim() || "미지정 (조직 탭에서 입력)"}`;
+    const ex = u.type === "dept" ? org.executives.find((p) => (p.oversees || []).map(Number).includes(u.id)) : null;
+    box.textContent = `전달 경로: 사장 → 비서실장(${sec ? sec.name : "공석·AI 대행"}) →${ex ? `\n담당 임원 ${ex.name} ${ex.rank} →` : ""}\n${this.chain(u)}\n기본 업무: ${u.role_text?.trim() || "미지정 (조직 탭에서 입력)"}`;
   }
   async submit() {
     const msg = this.root.querySelector("#od-msg"), btn = this.root.querySelector("#od-btn");
@@ -81,10 +85,11 @@ export class ProgressPanel {
         <button type="button" class="linkish" data-person="${a.character_id ?? ""}">${esc(p ? `${p.name} ${p.rank}` : "(퇴사자)")}</button>
         <span class="sub">업무: ${esc(a.task)}</span>
         ${a.result ? `<pre>${esc(a.result)}</pre>` : `<span class="sub">작업 중…</span>`}
-        ${a.result && a.status === "done" ? `<div class="verdict"><button type="button" class="btn small ${a.verdict === "adopted" ? "primary" : ""}" data-v="adopted" data-a="${a.id}">채택</button><button type="button" class="btn small ${a.verdict === "held" ? "danger" : ""}" data-v="held" data-a="${a.id}">보류</button></div>` : ""}
+        ${a.result && a.status === "done" ? scoreButtons("work", a.id, a.score) : ""}
       </div>`; }).join("")}
       ${kids.map((k) => this.node(ins, k)).join("")}
-      ${ur.summary ? `<details class="sum"><summary>${esc(ur.unit_name)} 보고서</summary><pre>${esc(ur.summary)}</pre></details>` : ""}
+      ${ur.summary ? `<details class="sum"><summary>${esc(ur.unit_name)} 보고서 (${esc(head?.name || "")})</summary><pre>${esc(ur.summary)}</pre></details>` : ""}
+      ${ur.summary && ur.status === "done" && !(work.length === 1 && work[0].character_id === ur.head_id && !kids.length) ? scoreButtons("report", ur.id, ur.score) : ""}
     </div>`;
   }
   render() {
@@ -103,10 +108,10 @@ export class ProgressPanel {
     }).join("");
   }
   async click(e) {
-    const r = e.target.closest("[data-retry]"), v = e.target.closest("[data-a]"), p = e.target.closest("[data-person]");
+    if (await handleScoreClick(e, this.store)) return;
+    const r = e.target.closest("[data-retry]"), p = e.target.closest("[data-person]");
     try {
       if (r) { r.disabled = true; await this.store.api.retry(+r.dataset.retry); await this.store.refresh(false); }
-      if (v) { v.disabled = true; const cur = v.classList.contains("primary") || v.classList.contains("danger"); await this.store.api.verdict(+v.dataset.a, cur ? null : v.dataset.v); await this.store.refresh(false); }
       if (p && p.dataset.person) this.onPerson?.(+p.dataset.person);
     } catch (err) { this.store.emit("toast", err.friendly || err.message); }
   }

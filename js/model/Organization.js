@@ -1,10 +1,13 @@
-/** Org chart rules: 팀(팀장1+팀원2↑) → 과(팀2↑, 과장) → 부(과2↑, 부장) → 임원(부 2·3·4개 = 이사·상무·전무). */
+/** 조직 규칙(직책): 팀(팀장1+팀원2↑) → 과(팀2↑) → 부(과2↑) → 담당 임원(부 1~4개). 직급은 점수로만 오릅니다. */
 export const UNIT_TYPES = {
-  dept: { label: "부", head: "부장", child: "section", parent: null },
-  section: { label: "과", head: "과장", child: "team", parent: "dept" },
+  dept: { label: "부", head: "부서장", child: "section", parent: null },
+  section: { label: "과", head: "과 책임자", child: "team", parent: "dept" },
   team: { label: "팀", head: "팀장", child: null, parent: "section" },
 };
-export const EXEC_RANKS = { 2: "이사", 3: "상무", 4: "전무" };
+/** 직급: earned by points the CEO gives (1~5 per report). Points reset to 0 on each promotion. */
+export const RANKS = ["사원", "주임", "대리", "과장", "차장", "부장", "이사", "상무", "전무"];
+export const NEXT_NEED = { 사원: 100, 주임: 200, 대리: 500, 과장: 700, 차장: 1000, 부장: 10000, 이사: 10000, 상무: 10000 };
+export function nextRank(rank) { const i = RANKS.indexOf(rank); return i >= 0 && i < RANKS.length - 1 ? { rank: RANKS[i + 1], need: NEXT_NEED[rank] } : null; }
 
 export class Organization {
   constructor(units = [], characters = []) {
@@ -16,7 +19,7 @@ export class Organization {
   get staff() { return this.people.filter((p) => p.role !== "ceo"); }
   get ceo() { return this.people.find((p) => p.role === "ceo") || null; }
   get secretary() { return this.people.find((p) => p.role === "secretary") || null; }
-  get executives() { return this.people.filter((p) => (p.oversees || []).length >= 2); }
+  get executives() { return this.people.filter((p) => (p.oversees || []).length >= 1); }
   ofType(type) { return this.units.filter((u) => u.type === type); }
   children(u) { return this.units.filter((x) => x.parent_id === u.id); }
   roots() { return this.units.filter((u) => !u.parent_id || !this.unit(u.parent_id)); }
@@ -38,11 +41,23 @@ export class Organization {
     if (u.type === "team") return this.members(u).concat(this.head(u) ? [this.head(u)] : []);
     return this.staff.filter((p) => p.role === "staff" && !(p.oversees || []).length);
   }
-  /** Rank label shown to the player. */
-  title(p) {
+  /** 직책 (position): what the person is in charge of, separate from 직급. */
+  position(p) {
     if (!p) return "";
+    if (p.role === "ceo") return "대표";
+    if (p.role === "secretary") return "비서실장";
+    const led = this.ledBy(p);
+    if (led.length) return led.map((u) => `${u.name} ${UNIT_TYPES[u.type].head}`).join(", ");
+    if ((p.oversees || []).length) return `담당 임원(${p.oversees.map((id) => this.unit(+id)?.name).filter(Boolean).join("·")})`;
     const u = this.unit(p.unit_id);
-    return [p.rank, u ? u.name : null].filter(Boolean).join(" · ");
+    if (u?.type === "team" && !u.head_id && this.people.filter((x) => x.unit_id === u.id && x.role === "staff").length === 1) return `${u.name} (1인 팀)`;
+    return u ? `${u.name} 소속` : "소속 없음";
+  }
+  /** "대리 · 플랫폼팀 팀장" */
+  title(p) { return p ? (p.role === "ceo" ? "사장" : `${p.rank} · ${this.position(p)}`) : ""; }
+  /** Units that can take an order: a head, or a team of exactly one person. */
+  get orderable() {
+    return this.units.filter((u) => u.head_id || (u.type === "team" && this.people.filter((x) => x.unit_id === u.id && x.role === "staff").length === 1));
   }
   path(u) {
     const out = []; let cur = u;

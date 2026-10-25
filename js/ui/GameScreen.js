@@ -157,6 +157,19 @@ export class GameScreen {
     };
     cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(frame);
     this.poll(false);
+    this.seatSecretary();
+  }
+  /** Give the 비서실장 a desk in the 비서실 on 10F if they have none yet. */
+  async seatSecretary() {
+    const sec = this.store.org.secretary; if (!sec || this.store.deskOf(sec)) return;
+    for (const f of [10, ...Building.floors.filter((x) => x !== 10)]) {
+      const lay = this.store.layout(f);
+      const room = lay.rooms.find((r) => r.name.includes("비서")); if (!room) continue;
+      const desk = lay.desks.find((d) => room.contains(d.cx, d.cy) && !this.store.occupantOf(f, d.id)); if (!desk) continue;
+      try { await this.store.api.assignDesk(sec.id, f, desk.id); await this.store.refresh(false); this.sim.rehome(); this.log(`비서실장 ${sec.name} 자리 배정 · ${Building.label(f)} ${room.name}`); }
+      catch { /* leave unseated; the player can seat them */ }
+      return;
+    }
   }
   stop() { this.running = false; cancelAnimationFrame(this.raf); clearTimeout(this.pollTimer); if (this.editor.active) this.editor.end(); }
 

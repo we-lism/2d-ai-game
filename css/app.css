@@ -336,3 +336,19 @@ canvas#floorCanvas{cursor:crosshair}
 .modal .tabs button{border:0;background:none;padding:8px 12px;border-bottom:2px solid transparent;color:var(--muted);font-weight:600}
 .modal .tabs button[aria-selected="true"]{color:var(--ink);border-color:var(--accent)}
 .rep .sub{font-size:12px;color:var(--muted)}
+.score{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.score-label{font-size:12px;color:var(--muted);margin-right:2px}
+.score-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--panel);font-weight:700;font-family:var(--f-mono)}
+.score-btn:hover{border-color:var(--amber);color:var(--amber)}
+.score-btn.on{background:var(--amber);border-color:var(--amber);color:#1b1306}
+.small-link{font-size:12px;margin-left:4px}
+.perf-col{display:grid;gap:8px}
+.perf-num small{font-size:13px;color:var(--muted);font-weight:500}
+.score{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.score-label{font-size:12px;color:var(--muted);margin-right:2px}
+.score-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--panel);font-weight:700;font-family:var(--f-mono)}
+.score-btn:hover{border-color:var(--amber);color:var(--amber)}
+.score-btn.on{background:var(--amber);border-color:var(--amber);color:#1b1306}
+.small-link{font-size:12px;margin-left:4px}
+.perf-col{display:grid;gap:8px}
+.perf-num small{font-size:13px;color:var(--muted);font-weight:500}

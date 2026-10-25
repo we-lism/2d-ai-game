@@ -7,10 +7,11 @@ export const HAIR_STYLES = ["짧은 머리", "가르마", "긴 머리", "묶은 
 export const EYE_STYLES = ["또렷한 눈", "웃는 눈", "동그란 눈"];
 export const MBTI = ["ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP", "INTP", "ESTP", "ESFP", "ENFP", "ENTP", "ESTJ", "ESFJ", "ENFJ", "ENTJ"];
 
-const SUR = "김이박최정강조윤장임한오서신권황안송류홍전고문양손배백허유남심노하곽성차주우구민".split("");
+// Surnames weighted roughly by how common they are in Korea; given names typical of people now in their 20s–50s.
+const SUR = [..."김김김김김이이이이박박최최정정", ..."강조윤장임한오서신권황안송류전홍고문양손배백허유남심노"];
 const GIVEN = {
-  남: ["민준", "서준", "도윤", "예준", "시우", "하준", "주원", "지호", "지훈", "준서", "현우", "건우", "우진", "선우", "연우", "정우", "승현", "태윤", "재원", "동현", "민재", "유찬", "이안", "로운"],
-  여: ["서연", "서윤", "지우", "하은", "민서", "하윤", "윤서", "지민", "채원", "수아", "지유", "예은", "다은", "소윤", "예린", "수빈", "지아", "유진", "은서", "나연", "시아", "아린", "다인", "하린"],
+  남: ["지훈", "성민", "현우", "준호", "민수", "동현", "정훈", "상훈", "성호", "재훈", "승현", "준영", "태호", "형준", "민호", "진우", "경민", "상우", "우진", "현석", "성진", "재민", "윤호", "영준", "종현", "도현", "시우", "건우", "민재", "세훈"],
+  여: ["지은", "수진", "민지", "지현", "은영", "혜진", "서연", "유진", "수연", "지혜", "현정", "미영", "소영", "은지", "지영", "예진", "하나", "보람", "수빈", "다은", "은정", "선영", "주희", "혜원", "지수", "민정", "나연", "윤서", "아름", "소연"],
 };
 
 /** Appearance of a character: everything the sprite needs. */
@@ -48,6 +49,6 @@ export class CandidateFactory {
 
   next() {
     const gender = Math.random() < 0.5 ? "남" : "여";
-    return { name: this.name(gender), gender, mbti: pick(MBTI), sincerity: 100, look: Look.random(gender).toJSON() };
+    return { name: this.name(gender), gender, mbti: pick(MBTI), look: Look.random(gender).toJSON() };
   }
 }

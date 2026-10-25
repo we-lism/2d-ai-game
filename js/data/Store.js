@@ -73,12 +73,11 @@ export class GameStore extends Emitter {
     return !!u && u.type === "team" && u.head_id !== p.id;
   }
 
+  /** Scores the CEO gave this person's results and reports. */
   performance(p) {
-    const work = this.workOf(p);
-    const adopted = work.filter((w) => w.a.verdict === "adopted").length;
-    const held = work.filter((w) => w.a.verdict === "held").length;
-    const judged = adopted + held;
-    return { total: work.length, adopted, held, judged, rate: judged ? Math.round((adopted / judged) * 100) : null };
+    const scores = this.historyOf(p).map((h) => (h.kind === "work" ? h.a.score : h.u.score)).filter(Boolean);
+    const avg = scores.length ? scores.reduce((s, n) => s + n, 0) / scores.length : null;
+    return { count: scores.length, avg: avg == null ? null : Math.round(avg * 10) / 10 };
   }
 
   async refresh(full = true) {
