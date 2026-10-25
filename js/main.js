@@ -18,6 +18,7 @@ class App {
     this.game = new GameScreen($("#game"), this.store, { onLogout: () => this.logout(), onEditCeo: () => { this.game.stop(); this.ceo.open(this.store); } });
     this.store.on("expired", () => this.logout("로그인이 만료되었습니다. 다시 로그인해 주세요."));
     this.api.onAuth((event, session) => {
+      if (session?.provider_refresh_token && this.#wantCalendar()) this.saveCalendarToken(session.provider_refresh_token);
       if (event === "PASSWORD_RECOVERY") { this.recovery = true; this.password.open({ recovery: true }); return; }
       if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session && !this.recovery && !this.game.running) this.route();
     });
@@ -42,6 +43,13 @@ class App {
       } finally { this.routing = null; }
     })();
     return this.routing;
+  }
+
+  #wantCalendar() { try { return localStorage.getItem("tower.linkCalendar") === "1"; } catch { return false; } }
+  async saveCalendarToken(token) {
+    try { localStorage.removeItem("tower.linkCalendar"); } catch { /* ignore */ }
+    try { await this.api.setGoogleToken(token); this.store.emit("toast", "구글 캘린더를 연결했습니다. 설정 탭에서 '알림 시험'을 눌러보세요."); if (this.game.running) await this.store.refresh(true); }
+    catch (e) { this.store.emit("toast", "캘린더 연결 저장 실패: " + (e.friendly || e.message)); }
   }
 
   async logout(notice) {

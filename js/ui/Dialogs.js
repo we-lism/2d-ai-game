@@ -29,7 +29,7 @@ export class HireDialog extends Modal {
       <dt>이름</dt><dd>${esc(c.name)}</dd><dt>성별</dt><dd>${c.gender}</dd>
       <dt>피부색</dt><dd><i class="sw" style="background:${c.look.skin}"></i>${skinName(c.look.skin)}</dd>
       <dt>얼굴</dt><dd>${HAIR_STYLES[c.look.hairStyle]} · ${EYE_STYLES[c.look.eyes]}</dd>
-      <dt>MBTI</dt><dd>${c.mbti}</dd><dt>성실함</dt><dd><span class="mono">100</span> / 100</dd>`;
+      <dt>MBTI</dt><dd>${c.mbti}</dd><dt>성실함</dt><dd><span class="mono">0%</span> <small class="muted">오늘 AI 사용량 ÷ 하루 한도 ${this.store.limitOf({}).toLocaleString()} 토큰</small></dd>`;
   }
   async hire() {
     const btn = this.foot.querySelector("[data-hire]"); btn.disabled = true;
@@ -128,7 +128,8 @@ export class EmployeeDialog extends Modal {
         <canvas width="120" height="150" class="portrait small" aria-label="${esc(p.name)} 얼굴"></canvas>
         <div class="emp-facts">
           <div class="kv"><span>MBTI</span><b>${esc(p.mbti || "-")}</b></div>
-          <div class="kv"><span>성실함</span><b class="mono">${p.role === "ceo" ? "-" : p.sincerity}</b></div>
+          ${p.role === "ceo" ? "" : (() => { const u = this.store.usage(p); return `<div class="kv"><span>성실함</span><b class="mono">${u.rate}%</b><small class="muted">${u.used.toLocaleString()} / ${u.limit.toLocaleString()} 토큰</small></div>
+          <div class="kv"><span>하루 한도</span><input id="emp-limit" type="number" min="1000" step="1000" value="${p.daily_limit || ""}" placeholder="${this.store.defaultLimit.toLocaleString()} (기본)" class="num-in"><button type="button" class="btn small" data-limit>저장</button></div>`; })()}
           <div class="kv"><span>자리</span><b>${desk ? `${Building.label(desk.floor)} ${esc(this.store.layout(desk.floor).roomOf(desk.item)?.name || "")}` : p.role === "ceo" ? "사장실" : "배정 전"}</b></div>
           <div class="kv"><span>지금</span><b>${esc(a?.bubble?.text || (a?.state === "off" ? "건물 밖" : a?.state === "walk" ? "이동 중" : "근무 중"))}</b></div>
           ${led.length ? `<div class="kv"><span>이끄는 조직</span><b>${esc(led.join(", "))}</b></div>` : ""}
@@ -153,13 +154,29 @@ export class EmployeeDialog extends Modal {
           <button type="button" class="btn small ${asg.verdict === "held" ? "danger" : ""}" data-v="held" data-a="${asg.id}">보류</button>
           ${asg.verdict ? `<button type="button" class="btn small" data-v="" data-a="${asg.id}">평가 취소</button>` : ""}
         </div></article>`).join("") || `<p class="empty-note">아직 올라온 보고서가 없습니다.</p>`}
-      <p class="hint">채택 +1, 보류 −3으로 성실함이 바뀝니다. 업무 성과 = 채택 ÷ (채택+보류).</p>`;
+      <p class="hint">성실함 = 오늘 쓴 AI 토큰 ÷ 하루 한도. 100%가 되면 그날은 일을 받지 않습니다. 업무 성과 = 채택 ÷ (채택+보류).</p>`;
     PersonSprite.portrait(this.body.querySelector("canvas"), p.look, { ceo: p.role === "ceo" });
   }
   async click(e) {
+    if (e.target.closest("[data-limit]")) {
+      const v = +this.body.querySelector("#emp-limit").value;
+      try { await this.store.api.setLimit(this.personId, v ? Math.max(1000, Math.round(v)) : null); await this.store.refresh(false); this.store.emit("toast", "하루 한도를 저장했습니다."); }
+      catch (err) { this.store.emit("toast", err.friendly || err.message); }
+      return;
+    }
     const b = e.target.closest("[data-a]"); if (!b) return;
     b.disabled = true;
     try { await this.store.api.verdict(+b.dataset.a, b.dataset.v || null); await this.store.refresh(false); }
     catch (err) { this.store.emit("toast", err.friendly || err.message); b.disabled = false; }
+  }
+}
+
+/** Elevator panel: press a floor and the CEO rides there. */
+export class ElevatorDialog extends Modal {
+  constructor(current, onPick) {
+    super("엘리베이터");
+    this.body.innerHTML = `<p class="hint">가실 층을 누르세요. 지금 ${Building.label(current)}에 계십니다.</p>
+      <div class="ev-pad">${Building.floors.map((f) => `<button type="button" class="ev-btn" data-f="${f}" ${f === current ? "disabled" : ""}>${Building.label(f)}</button>`).join("")}</div>`;
+    this.body.addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; onPick(+b.dataset.f); this.close(); });
   }
 }

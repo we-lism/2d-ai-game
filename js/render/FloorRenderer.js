@@ -121,7 +121,7 @@ export class FloorRenderer {
 
   /* ---------- frame ---------- */
   /** editor: optional LayoutEditor (draws its draft + selection instead of the saved layout). */
-  draw({ editor = null, selectedId = null, hoverDesk = null } = {}) {
+  draw({ editor = null, selectedId = null, hoverDesk = null, marker = null } = {}) {
     const g = this.g, T = this.T, cam = this.cam, f = this.floor;
     const layout = editor?.active ? editor.draft : this.store.layout(f);
     g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = T.bg; g.fillRect(0, 0, this.cv.width, this.cv.height);
@@ -146,6 +146,10 @@ export class FloorRenderer {
     this.floorRect(t.elev.x, t.elev.y, t.elev.w, t.elev.h, evHere ? T.amber : T.panel2);
     if (f === 1) this.floorRect(Building.entrance.x0, Building.H - 60, Building.entrance.x1 - Building.entrance.x0, 38, T.accent);
     if (editor?.active) editor.drawUnder(this);
+    if (marker && marker.floor === f && marker.until > performance.now()) {
+      const [u, v] = Iso.P(marker.x, marker.y); const k = (marker.until - performance.now()) / 1200;
+      g.strokeStyle = T.amber; g.lineWidth = cam.px(2.5); g.beginPath(); g.ellipse(u, v, 10 + 10 * (1 - k), 5 + 5 * (1 - k), 0, 0, Math.PI * 2); g.stroke();
+    }
     if (hoverDesk) this.outline(this.rectPts(hoverDesk.x - 3, hoverDesk.y - 3, hoverDesk.fw + 6, hoverDesk.fh + 6), T.amber, 2);
 
     const scene = editor?.active ? this.buildScene(layout, { tint: (it) => (editor.invalid.has(it.id) ? T["s-err"] : null) }) : this.scene(layout);

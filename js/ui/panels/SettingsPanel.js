@@ -14,6 +14,19 @@ export class SettingsPanel {
         <div id="k-msg" hidden></div>
       </section>
       <section class="stack">
+        <h3>보고 알림 (구글 캘린더)</h3>
+        <p class="hint">보고가 완료될 때마다 비서실이 대표님 구글 캘린더에 일정을 등록하고 알림을 띄웁니다.</p>
+        <div class="row-between"><span id="cal-state"></span><span class="hint" id="cal-note"></span></div>
+        <div class="row-between"><button class="btn small primary" type="button" id="btn-cal">구글 캘린더 연결</button><button class="btn small" type="button" id="btn-cal-test">알림 시험</button><button class="btn small" type="button" id="btn-cal-off">연결 해제</button></div>
+        <div id="cal-msg" hidden></div>
+      </section>
+      <section class="stack">
+        <h3>성실함 (하루 AI 사용 한도)</h3>
+        <p class="hint">성실함 = 오늘 쓴 AI 토큰 ÷ 하루 한도. 직원별 한도는 직원을 눌러 바꿉니다.</p>
+        <div class="key-row"><div class="field"><label for="def-limit">기본 하루 한도 (토큰)</label><input id="def-limit" type="number" min="1000" step="1000"></div><button class="btn small" type="button" id="btn-limit">저장</button></div>
+        <div id="lim-msg" hidden></div>
+      </section>
+      <section class="stack">
         <h3>내 정보</h3>
         <div class="field"><label for="pf-name">이름</label><input id="pf-name" maxlength="30"></div>
         <div class="field"><label for="pf-phone">연락처</label><input id="pf-phone" inputmode="tel"></div>
@@ -36,13 +49,30 @@ export class SettingsPanel {
     root.querySelector("#btn-profile").onclick = () => this.saveProfile();
     root.querySelector("#btn-pw").onclick = () => this.changePw();
     root.querySelector("#btn-ceo").onclick = () => onEditCeo?.();
+    root.querySelector("#btn-cal").onclick = async () => { try { await store.api.linkGoogleCalendar(); } catch (e) { show(root.querySelector("#cal-msg"), "구글 연결을 시작하지 못했습니다: " + e.message, "err"); } };
+    root.querySelector("#btn-cal-test").onclick = async () => {
+      const m = root.querySelector("#cal-msg");
+      try { await store.api.testCalendar(); show(m, "시험 알림을 보냈습니다. 10초 뒤 결과가 표시됩니다.", "ok"); setTimeout(() => store.refresh(true), 10000); }
+      catch (e) { show(m, e.friendly || e.message, "err"); }
+    };
+    root.querySelector("#btn-cal-off").onclick = async () => { try { await store.api.setGoogleToken(""); await store.refresh(true); show(root.querySelector("#cal-msg"), "연결을 해제했습니다.", "ok"); } catch (e) { show(root.querySelector("#cal-msg"), e.friendly || e.message, "err"); } };
+    root.querySelector("#btn-limit").onclick = async () => {
+      const v = Math.round(+root.querySelector("#def-limit").value); const m = root.querySelector("#lim-msg");
+      if (!(v >= 1000)) return show(m, "1,000 이상으로 입력하세요.", "err");
+      try { await store.api.setLimit(null, v); await store.refresh(true); show(m, "기본 한도를 저장했습니다.", "ok"); } catch (e) { show(m, e.friendly || e.message, "err"); }
+    };
   }
   render() {
     const p = this.store.profile; if (!p) return;
     const st = (has) => (has ? `<span class="pill done">등록됨</span>` : `<span class="pill">없음</span>`);
     this.root.querySelector("#ks-openai").innerHTML = st(p.has_openai);
     this.root.querySelector("#ks-gemini").innerHTML = st(p.has_gemini);
+    this.root.querySelector("#cal-state").innerHTML = p.has_google ? `<span class="pill done">연결됨</span>` : `<span class="pill">연결 안 됨</span>`;
+    this.root.querySelector("#cal-note").textContent = p.calendar_note ? "최근 시험: " + p.calendar_note.replace(/ · \S+$/, "") : "";
+    this.root.querySelector("#btn-cal-test").disabled = !p.has_google;
+    this.root.querySelector("#btn-cal-off").disabled = !p.has_google;
     if (!this.root.contains(document.activeElement)) {
+      this.root.querySelector("#def-limit").value = p.default_limit || 50000;
       this.root.querySelector("#pf-name").value = p.name || ""; this.root.querySelector("#pf-phone").value = p.phone || ""; this.root.querySelector("#pf-engine").value = p.report_engine || "openai";
     }
   }

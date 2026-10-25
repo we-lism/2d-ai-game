@@ -49,6 +49,15 @@ export class Api {
     const { error } = await this.sb.auth.signInWithOAuth({ provider, options: { redirectTo: this.siteUrl } });
     if (error) throw new ApiError("OAUTH", error.message);
   }
+  /** Google sign-in that also grants calendar.events (offline) so reports can be put on the CEO's calendar. */
+  async linkGoogleCalendar() {
+    try { localStorage.setItem("tower.linkCalendar", "1"); } catch { /* storage blocked */ }
+    const { error } = await this.sb.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: this.siteUrl, scopes: "https://www.googleapis.com/auth/calendar.events", queryParams: { access_type: "offline", prompt: "consent" } },
+    });
+    if (error) throw new ApiError("OAUTH", error.message);
+  }
   async sendRecovery(email) {
     const { error } = await this.sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: this.siteUrl });
     if (error) throw new ApiError("MAIL", /rate|many|seconds/i.test(error.message) ? "메일 발송 한도에 걸렸습니다. 1시간 뒤 다시 시도해 주세요." : "메일을 보내지 못했습니다: " + error.message);
@@ -104,5 +113,8 @@ export class Api {
   issue(unitId, content) { return this.call("issue_instruction", { p_unit: unitId, p_content: content }); }
   retry(id) { return this.call("retry_instruction", { p_id: id }); }
   requestReport() { return this.call("request_report"); }
+  setLimit(charId, limit) { return this.call("set_limit", { p_char: charId, p_limit: limit }); }
+  setGoogleToken(token) { return this.call("set_google_token", { p_token: token }); }
+  testCalendar() { return this.call("test_calendar"); }
   verdict(assignmentId, verdict) { return this.call("verdict", { p_assignment: assignmentId, p_verdict: verdict }); }
 }

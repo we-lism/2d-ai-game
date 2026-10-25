@@ -1,79 +1,106 @@
 import { esc, show, fmtTime } from "../../util/dom.js";
 
-const STATUS = { queued: "비서 전달 중", assigning: "업무 분배 회의", working: "팀원 수행 중", reporting: "팀장 취합 중", done: "보고 완료", error: "오류" };
+const STATUS = { queued: "비서실 전달 중", assigning: "업무 틀 작성", working: "수행 중", reporting: "보고 취합 중", done: "보고 완료", error: "오류" };
 const ENGINE = { openai: "ChatGPT", gemini: "Gemini" };
 
-/** 지시: pick a team, write the order. */
+const TYPE = { dept: "부", section: "과", team: "팀" };
+
+/** 지시: 대표가 담당 조직(부·과·팀)을 고르면 비서실이 그 조직장에게 전달합니다. */
 export class OrderPanel {
   constructor(root, store, { onIssued }) {
     Object.assign(this, { root, store, onIssued });
     root.innerHTML = `
-      <div class="flow"><span>사장 지시</span><span>비서 전달</span><span>팀장 배분</span><span>팀원 수행</span></div>
+      <div class="flow"><span>사장</span><span>비서실</span><span>조직장</span><span>팀장·팀원</span></div>
       <form id="f-order" class="stack">
-        <div class="field"><label for="od-team">담당 팀</label><select id="od-team"></select></div>
+        <div class="field"><label for="od-team">담당 조직</label><select id="od-team"></select></div>
         <div class="role-preview" id="od-role"></div>
         <div class="field"><label for="od-text">지시 내용</label><textarea id="od-text" maxlength="4000" required placeholder="예) 다음 달 협력 마을 방문 일정 초안을 3안으로 만들어 주세요."></textarea></div>
-        <button class="btn primary" type="submit" id="od-btn">비서에게 전달</button>
+        <button class="btn primary" type="submit" id="od-btn">비서실에 전달</button>
         <div id="od-msg" hidden></div>
       </form>
-      <p class="hint">지시는 팀장이 있는 팀에만 내릴 수 있습니다. 조직 탭에서 팀을 만들고 팀장을 임명하세요.</p>`;
+      <p class="hint">완료될 때마다 비서실이 정리·요약해 보고합니다. 구글 캘린더를 연결하면 알림으로도 받습니다(설정 탭).</p>`;
     this.sel = root.querySelector("#od-team");
     this.sel.addEventListener("change", () => this.preview());
     root.querySelector("#f-order").addEventListener("submit", (e) => { e.preventDefault(); this.submit(); });
   }
   render() {
     const org = this.store.org; const keep = this.sel.value;
-    const teams = org.workingTeams;
-    this.sel.innerHTML = teams.length ? teams.map((t) => `<option value="${t.id}">${esc(org.path(t))}</option>`).join("") : `<option value="">팀장이 있는 팀이 없습니다</option>`;
-    if (keep && teams.some((t) => String(t.id) === keep)) this.sel.value = keep;
-    this.root.querySelector("#od-btn").disabled = !teams.length;
+    const units = org.units.filter((u) => u.head_id).sort((a, b) => ["dept", "section", "team"].indexOf(a.type) - ["dept", "section", "team"].indexOf(b.type));
+    this.sel.innerHTML = units.length ? units.map((u) => `<option value="${u.id}">[${TYPE[u.type]}] ${esc(org.path(u))} · ${esc(org.head(u)?.name || "")} ${esc(org.head(u)?.rank || "")}</option>`).join("") : `<option value="">장이 임명된 조직이 없습니다</option>`;
+    if (keep && units.some((u) => String(u.id) === keep)) this.sel.value = keep;
+    this.root.querySelector("#od-btn").disabled = !units.length;
     this.preview();
   }
+  /** Shows the chain this order will travel. */
+  chain(u, depth = 0) {
+    const org = this.store.org; const head = org.head(u);
+    const kids = org.children(u).filter((c) => c.head_id);
+    const line = `${"  ".repeat(depth)}${TYPE[u.type]} ${u.name}: ${head ? head.name + " " + head.rank : "공석"}${u.type === "team" ? ` (팀원 ${org.members(u).length}명)` : ""}`;
+    return [line, ...kids.map((k) => this.chain(k, depth + 1))].join("\n");
+  }
   preview() {
-    const org = this.store.org; const t = org.unit(+this.sel.value);
+    const org = this.store.org; const u = org.unit(+this.sel.value);
     const box = this.root.querySelector("#od-role");
-    if (!t) { box.textContent = "조직 탭에서 팀을 만들고, 팀원 2명 이상을 넣은 뒤 팀장을 임명하면 지시를 내릴 수 있습니다."; return; }
-    const lead = org.head(t);
-    box.textContent = `팀장: ${lead ? lead.name : "-"} · 팀원 ${org.members(t).length}명 · AI: ${ENGINE[t.engine]}\n팀 역할: ${t.role_text?.trim() || "아직 지정하지 않았습니다. 조직 탭에서 입력하세요."}`;
+    if (!u) { box.textContent = "조직 탭에서 조직을 만들고 장을 임명하면 지시를 내릴 수 있습니다."; return; }
+    const sec = org.secretary;
+    box.textContent = `전달 경로: 사장 → 비서실(${sec ? sec.name : "공석·AI 대행"}) →\n${this.chain(u)}\n기본 업무: ${u.role_text?.trim() || "미지정 (조직 탭에서 입력)"}`;
   }
   async submit() {
     const msg = this.root.querySelector("#od-msg"), btn = this.root.querySelector("#od-btn");
     const text = this.root.querySelector("#od-text").value.trim(); if (!text || !this.sel.value) return;
-    btn.disabled = true; show(msg, "비서에게 전달 중…");
+    btn.disabled = true; show(msg, "비서실에 전달 중…");
     try {
       const r = await this.store.api.issue(+this.sel.value, text);
       this.root.querySelector("#od-text").value = "";
       show(msg, "전달했습니다. 진행 탭과 건물 화면에서 흐름을 볼 수 있습니다.", "ok");
-      this.onIssued?.({ id: r.id, unit_id: +this.sel.value, content: text, status: "queued", assignments: [], created_at: new Date().toISOString() });
+      this.onIssued?.({ id: r.id, unit_id: +this.sel.value, content: text, status: "queued", assignments: [], units: [], created_at: new Date().toISOString() });
     } catch (e) { show(msg, e.friendly || e.message, "err"); }
     finally { btn.disabled = false; }
   }
 }
 
-/** 진행: every order with meeting notes, member results, adopt/hold, leader summary. */
+const UR_STATUS = { planning: "업무 틀 작성", working: "수행 중", summarizing: "보고서 작성", done: "보고 완료", error: "오류" };
+
+/** 진행: secretary's report on top, then the chain tree with each head's frame and summary, and members' results. */
 export class ProgressPanel {
   constructor(root, store, { onPerson }) {
     Object.assign(this, { root, store, onPerson }); this.open = new Set();
-    root.addEventListener("toggle", (e) => { const d = e.target.closest?.("details"); if (d) d.open ? this.open.add(+d.dataset.id) : this.open.delete(+d.dataset.id); }, true);
+    root.addEventListener("toggle", (e) => { const d = e.target.closest?.("details.ins"); if (d) d.open ? this.open.add(+d.dataset.id) : this.open.delete(+d.dataset.id); }, true);
     root.addEventListener("click", (e) => this.click(e));
+  }
+  node(ins, ur) {
+    const org = this.store.org; const head = org.person(ur.head_id);
+    const kids = (ins.units || []).filter((u) => u.parent_id === ur.id);
+    const work = (ins.assignments || []).filter((a) => a.unit_report_id === ur.id);
+    return `<div class="ur ${ur.status}">
+      <div class="ur-head"><span class="pill ${ur.status === "done" ? "done" : ur.status === "error" ? "error" : "working"}">${UR_STATUS[ur.status]}</span>
+        <b>${esc(ur.unit_name)}</b> <button type="button" class="linkish" data-person="${ur.head_id ?? ""}">${esc(head ? head.name + " " + head.rank : "")}</button></div>
+      <div class="sub">받은 일: ${esc(ur.task)}</div>
+      ${ur.plan_note ? `<div class="sub">업무 틀: ${esc(ur.plan_note)}</div>` : ""}
+      ${work.map((a) => { const p = org.person(a.character_id); return `<div class="asg ${a.status}">
+        <button type="button" class="linkish" data-person="${a.character_id ?? ""}">${esc(p ? `${p.name} ${p.rank}` : "(퇴사자)")}</button>
+        <span class="sub">업무: ${esc(a.task)}</span>
+        ${a.result ? `<pre>${esc(a.result)}</pre>` : `<span class="sub">작업 중…</span>`}
+        ${a.result && a.status === "done" ? `<div class="verdict"><button type="button" class="btn small ${a.verdict === "adopted" ? "primary" : ""}" data-v="adopted" data-a="${a.id}">채택</button><button type="button" class="btn small ${a.verdict === "held" ? "danger" : ""}" data-v="held" data-a="${a.id}">보류</button></div>` : ""}
+      </div>`; }).join("")}
+      ${kids.map((k) => this.node(ins, k)).join("")}
+      ${ur.summary ? `<details class="sum"><summary>${esc(ur.unit_name)} 보고서</summary><pre>${esc(ur.summary)}</pre></details>` : ""}
+    </div>`;
   }
   render() {
     const org = this.store.org, list = this.store.instructions;
     if (!list.length) { this.root.innerHTML = `<div class="empty-note">아직 내린 지시가 없습니다.</div>`; return; }
-    this.root.innerHTML = list.map((i) => `<details class="ins" data-id="${i.id}" ${this.open.has(i.id) ? "open" : ""}><summary>
-      <div class="top"><span class="pill ${i.status}">${STATUS[i.status]}</span><span>${esc(org.unit(i.unit_id)?.name || "삭제된 팀")}</span><span>${fmtTime(i.created_at)}</span>${i.engine_used ? `<span>${ENGINE[i.engine_used]}</span>` : ""}</div>
-      <div class="content">${esc(i.content)}</div></summary>
-      <div class="body">
-        ${i.error ? `<div class="msg err">${esc(i.error)}</div><button class="btn small" type="button" data-retry="${i.id}">다시 시도</button>` : ""}
-        ${i.meeting_note ? `<div><h5>업무 분배 회의</h5><pre>${esc(i.meeting_note)}</pre></div>` : ""}
-        ${(i.assignments || []).map((a) => { const p = org.person(a.character_id); return `<div class="asg ${a.status}">
-          <button type="button" class="linkish" data-person="${a.character_id ?? ""}">${esc(p ? `${p.name} ${p.rank}` : "(퇴사자)")}</button>
-          <span class="sub">업무: ${esc(a.task)}</span>
-          ${a.result ? `<pre>${esc(a.result)}</pre>` : `<span class="sub">작업 중…</span>`}
-          ${a.result && a.status === "done" ? `<div class="verdict"><button type="button" class="btn small ${a.verdict === "adopted" ? "primary" : ""}" data-v="adopted" data-a="${a.id}">채택</button><button type="button" class="btn small ${a.verdict === "held" ? "danger" : ""}" data-v="held" data-a="${a.id}">보류</button></div>` : ""}
-        </div>`; }).join("")}
-        ${i.leader_summary ? `<div><h5>팀장 취합 보고</h5><pre>${esc(i.leader_summary)}</pre></div>` : ""}
-      </div></details>`).join("");
+    this.root.innerHTML = list.map((i) => {
+      const top = (i.units || []).find((u) => !u.parent_id);
+      return `<details class="ins" data-id="${i.id}" ${this.open.has(i.id) ? "open" : ""}><summary>
+        <div class="top"><span class="pill ${i.status}">${STATUS[i.status]}</span><span>${esc(org.unit(i.unit_id)?.name || "삭제된 조직")}</span><span>${fmtTime(i.created_at)}</span></div>
+        <div class="content">${esc(i.content)}</div></summary>
+        <div class="body">
+          ${i.error ? `<div class="msg err">${esc(i.error)}</div><button class="btn small" type="button" data-retry="${i.id}">다시 시도</button>` : ""}
+          ${i.secretary_report ? `<div class="sec-rep"><h5>비서실 보고 (대표님께)</h5><pre>${esc(i.secretary_report)}</pre>${i.calendar_status ? `<small class="muted">알림: ${esc(i.calendar_status)}</small>` : ""}</div>` : ""}
+          ${top ? this.node(i, top) : `<div class="sub">비서실이 조직장에게 전달하고 있습니다.</div>`}
+        </div></details>`;
+    }).join("");
   }
   async click(e) {
     const r = e.target.closest("[data-retry]"), v = e.target.closest("[data-a]"), p = e.target.closest("[data-person]");

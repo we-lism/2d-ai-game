@@ -42,6 +42,26 @@ export class GameStore extends Emitter {
     for (const ins of this.instructions) for (const a of ins.assignments || []) if (a.character_id === p.id) out.push({ ins, a });
     return out;
   }
+  /* 성실함 = today's AI tokens ÷ daily limit */
+  limitOf(p) { return p?.daily_limit || this.defaultLimit || 50000; }
+  usage(p) { const used = p?.used_today || 0, limit = this.limitOf(p); return { used, limit, rate: Math.min(999, Math.round((used / limit) * 100)) }; }
+
+  /** An assignment this person is working on right now. */
+  activeWork(p) {
+    for (const ins of this.instructions) {
+      if (!["assigning", "working", "reporting"].includes(ins.status)) continue;
+      const a = (ins.assignments || []).find((x) => x.character_id === p.id && x.status === "working");
+      if (a) return { ins, a };
+    }
+    return null;
+  }
+  /** Plain team members rest on 2F until their leader calls them. */
+  isTeamMember(p) {
+    if (!p || p.role !== "staff" || (p.oversees || []).length) return false;
+    const u = this.units.find((x) => x.id === p.unit_id);
+    return !!u && u.type === "team" && u.head_id !== p.id;
+  }
+
   performance(p) {
     const work = this.workOf(p);
     const adopted = work.filter((w) => w.a.verdict === "adopted").length;
@@ -57,6 +77,7 @@ export class GameStore extends Emitter {
       const saved = new Map((st.floors || []).map((f) => [f.floor, f.layout]));
       for (const f of Building.floors) this.layouts.set(f, FloorLayout.from(f, saved.get(f)));
     }
+    this.defaultLimit = st.default_limit || this.defaultLimit || 50000;
     this.units = st.units || [];
     this.characters = st.characters || [];
     this.instructions = st.instructions || [];

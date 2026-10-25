@@ -313,3 +313,20 @@ button.chip{padding:3px 10px}
   .hr-actions{grid-column:1/-1}
   .floors{grid-template-columns:repeat(auto-fill,minmax(64px,1fr));grid-column:1/-1}
 }
+
+/* v3: report chain, elevator, usage */
+.ur{border-left:3px solid var(--line);padding:6px 0 6px 10px;display:grid;gap:6px;margin-top:4px}
+.ur.done{border-color:var(--s-ok)} .ur.error{border-color:var(--s-err)} .ur.working,.ur.planning,.ur.summarizing{border-color:var(--s-info)}
+.ur .ur{margin-left:6px}
+.ur-head{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px}
+.ur .sub{font-size:12px;color:var(--muted)}
+.sum summary{cursor:pointer;font-size:12px;color:var(--accent);font-weight:600}
+.sum pre,.sec-rep pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--f-body);font-size:13px;margin:4px 0 0;background:var(--panel2);padding:10px;border-radius:6px}
+.sec-rep{border:1px solid var(--accent);border-radius:8px;padding:10px;display:grid;gap:4px}
+.sec-rep h5{margin:0;font-size:12px;color:var(--accent)}
+.ev-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ev-btn{height:52px;border-radius:50%;border:2px solid var(--line);background:var(--panel2);font-family:var(--f-display);font-size:18px;aspect-ratio:1;justify-self:center;width:60px;height:60px}
+.ev-btn:hover:not(:disabled){border-color:var(--amber);color:var(--amber)}
+.ev-btn:disabled{background:var(--amber);color:#1b1306;border-color:var(--amber);opacity:1;cursor:default}
+.num-in{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:4px 8px;width:140px}
+canvas#floorCanvas{cursor:crosshair}

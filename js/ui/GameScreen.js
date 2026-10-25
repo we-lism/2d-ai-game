@@ -5,7 +5,8 @@ import { TaskDirector } from "../sim/TaskDirector.js";
 import { FloorRenderer } from "../render/FloorRenderer.js";
 import { Iso, Camera } from "../render/Iso.js";
 import { LayoutEditor } from "./LayoutEditor.js";
-import { HireDialog, FireDialog, DeskDialog, EmployeeDialog } from "./Dialogs.js";
+import { HireDialog, FireDialog, DeskDialog, EmployeeDialog, ElevatorDialog } from "./Dialogs.js";
+import { Act } from "../sim/Actor.js";
 import { OrderPanel, ProgressPanel, ReportsPanel } from "./panels/WorkPanels.js";
 import { OrgPanel } from "./panels/OrgPanel.js";
 import { SettingsPanel } from "./panels/SettingsPanel.js";
@@ -109,7 +110,11 @@ export class GameScreen {
         if (drag.moved && cam.z > Camera.FIT) { cam.panBy(dx, dy); drag.x = e.clientX; drag.y = e.clientY; cam.follow = false; }
         return;
       }
-      if (!this.editor.active) { const it = this.renderer.itemAt(e.clientX, e.clientY); this.hoverDesk = it?.type === "desk" && !this.renderer.actorAt(e.clientX, e.clientY) ? it : null; cv.style.cursor = this.hoverDesk ? "pointer" : ""; }
+      if (!this.editor.active) {
+        const onActor = !!this.renderer.actorAt(e.clientX, e.clientY);
+        const it = this.renderer.itemAt(e.clientX, e.clientY); this.hoverDesk = it?.type === "desk" && !onActor ? it : null;
+        cv.style.cursor = this.hoverDesk || onActor || this.isElevatorClick(e.clientX, e.clientY) ? "pointer" : "crosshair";
+      }
     });
     cv.addEventListener("pointerup", (e) => {
       const d = drag; drag = null; if (!d) return;
@@ -119,7 +124,8 @@ export class GameScreen {
       if (a) { this.selected = a.id; cam.follow = cam.z > Camera.FIT; this.openPerson(a.id); return; }
       const it = this.renderer.itemAt(e.clientX, e.clientY);
       if (it?.type === "desk") { new DeskDialog(this.store, this.floor, it).open(); return; }
-      this.selected = null;
+      if (this.isElevatorClick(e.clientX, e.clientY)) { this.openElevator(); return; }
+      this.moveCeoTo(this.floor, this.renderer.cam.toPlan(e.clientX, e.clientY));
     });
     cv.addEventListener("pointerleave", () => { this.hoverDesk = null; });
     cv.addEventListener("wheel", (e) => {
@@ -132,7 +138,7 @@ export class GameScreen {
   start() {
     this.sim.actors.clear(); this.sim.navs.clear();
     this.sim.sync(true);
-    this.director.known.clear(); this.director.reports.clear();
+    this.director.seen.clear(); this.director.reports.clear();
     this.director.apply(true);
     for (const s of $$(".screen")) s.hidden = s !== this.root;
     this.renderer.cam.resize(); this.setFloor(10);
@@ -145,7 +151,7 @@ export class GameScreen {
       const dt = Math.min(100, t - (this.last || t)); this.last = t;
       this.sim.tick(dt);
       this.renderer.floor = this.floor;
-      this.renderer.draw({ editor: this.editor, selectedId: this.selected, hoverDesk: this.hoverDesk });
+      this.renderer.draw({ editor: this.editor, selectedId: this.selected, hoverDesk: this.hoverDesk, marker: this.marker });
       if ((this.tickN = (this.tickN || 0) + 1) % 15 === 0) { $("#clock", this.root).textContent = this.sim.clock; $("#dayLabel", this.root).textContent = `${this.sim.day}일차 · 게임 시각`; this.building.render(this.floor); }
       this.raf = requestAnimationFrame(frame);
     };
@@ -169,6 +175,35 @@ export class GameScreen {
     $("#editMsg", this.root).hidden = false;
   }
   syncSpeed() { $$(".speed button", this.root).forEach((x) => x.setAttribute("aria-pressed", +x.dataset.speed === this.sim.speed)); }
+
+  /* ---------- the CEO is steered by the player ---------- */
+  ceoActor() { const c = this.store.org.ceo; return c ? this.sim.actors.get(c.id) : null; }
+  moveCeoTo(floor, p) {
+    const a = this.ceoActor(); if (!a) return;
+    const n = Building.inner;
+    if (p.x < n.x0 + 8 || p.x > n.x1 - 8 || p.y < n.y0 + 8 || p.y > n.y1 - 8) return;
+    if (a.state === "off") { const h = this.sim.home(a); a.place(h.floor, h.point); }
+    a.manual = true;
+    a.enqueue([Act.go(floor, { x: Math.round(p.x), y: Math.round(p.y) }, { exact: true })], true);
+    this.marker = { floor, x: p.x, y: p.y, until: performance.now() + 1200 };
+    if (a.floor !== floor) this.log(`사장님 ${Building.label(floor)}로 이동`);
+  }
+  isElevatorClick(cx, cy) {
+    const e = Building.transports.elev; const [u, v] = this.renderer.cam.toWorld(cx, cy);
+    return [0, 30, 60].some((z) => { const p = Iso.unproject(u, v + z); return p.x > e.x - 12 && p.x < e.x + e.w + 6 && p.y > e.y - 12 && p.y < e.y + e.h + 12; });
+  }
+  openElevator() {
+    const a = this.ceoActor();
+    new ElevatorDialog(a ? a.floor : this.floor, (f) => this.rideElevator(f)).open();
+  }
+  rideElevator(f) {
+    const a = this.ceoActor(); if (!a) return;
+    if (a.state === "off") { const h = this.sim.home(a); a.place(h.floor, h.point); }
+    a.manual = true; this.selected = a.id;
+    const out = { x: 868, y: 300 };
+    a.enqueue([Act.say(`${Building.label(f)} 버튼`, 1500), Act.go(f, out, { exact: true, via: "elev" }), Act.call(() => this.setFloor(f))], true);
+    this.log(`사장님 엘리베이터 탑승 → ${Building.label(f)}`);
+  }
 
   /* ---------- data ---------- */
   onStore() {
