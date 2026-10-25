@@ -1,15 +1,15 @@
-import { $, $$, esc } from "../util/dom.js";
-import { Building } from "../model/Layout.js";
-import { Simulation } from "../sim/Simulation.js";
-import { TaskDirector } from "../sim/TaskDirector.js";
-import { FloorRenderer } from "../render/FloorRenderer.js";
-import { Iso, Camera } from "../render/Iso.js";
-import { LayoutEditor } from "./LayoutEditor.js";
-import { HireDialog, FireDialog, DeskDialog, EmployeeDialog, ElevatorDialog, RoomDialog } from "./Dialogs.js";
-import { Act } from "../sim/Actor.js";
-import { OrderPanel, ProgressPanel, ReportsPanel } from "./panels/WorkPanels.js";
-import { OrgPanel } from "./panels/OrgPanel.js";
-import { SettingsPanel } from "./panels/SettingsPanel.js";
+import { $, $$, esc } from "../util/dom.js?v=202610251159";
+import { Building } from "../model/Layout.js?v=202610251159";
+import { Simulation } from "../sim/Simulation.js?v=202610251159";
+import { TaskDirector } from "../sim/TaskDirector.js?v=202610251159";
+import { FloorRenderer } from "../render/FloorRenderer.js?v=202610251159";
+import { Iso, Camera } from "../render/Iso.js?v=202610251159";
+import { LayoutEditor } from "./LayoutEditor.js?v=202610251159";
+import { HireDialog, FireDialog, DeskDialog, EmployeeDialog, ElevatorDialog, RoomDialog } from "./Dialogs.js?v=202610251159";
+import { Act } from "../sim/Actor.js?v=202610251159";
+import { OrderPanel, ProgressPanel, ReportsPanel } from "./panels/WorkPanels.js?v=202610251159";
+import { OrgPanel } from "./panels/OrgPanel.js?v=202610251159";
+import { SettingsPanel } from "./panels/SettingsPanel.js?v=202610251159";
 
 const FLOOR_SUMMARY = (layout) => layout.rooms.length ? layout.rooms.map((r) => r.name).join(" · ") : "비어 있음";
 

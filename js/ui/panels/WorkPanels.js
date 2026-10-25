@@ -1,5 +1,5 @@
-import { esc, show, fmtTime } from "../../util/dom.js";
-import { scoreButtons, handleScoreClick } from "../Score.js";
+import { esc, show, fmtTime } from "../../util/dom.js?v=202610251159";
+import { scoreButtons, handleScoreClick } from "../Score.js?v=202610251159";
 
 const STATUS = { queued: "비서실 전달 중", assigning: "업무 틀 작성", working: "수행 중", reporting: "보고 취합 중", done: "보고 완료", error: "오류" };
 const ENGINE = { openai: "ChatGPT", gemini: "Gemini" };

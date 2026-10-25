@@ -1,7 +1,7 @@
-import { $, $$, show } from "../util/dom.js";
-import { Building } from "../model/Layout.js";
-import { Look, SKINS, HAIRS, SUITS, HAIR_STYLES, EYE_STYLES } from "../model/Look.js";
-import { PersonSprite } from "../render/PersonSprite.js";
+import { $, $$, show } from "../util/dom.js?v=202610251159";
+import { Building } from "../model/Layout.js?v=202610251159";
+import { Look, SKINS, HAIRS, SUITS, HAIR_STYLES, EYE_STYLES } from "../model/Look.js?v=202610251159";
+import { PersonSprite } from "../render/PersonSprite.js?v=202610251159";
 
 const FLOOR_TEXT = {
   10: "사장실 · 비서실", 9: "임원회의실 · 임원실 · 전략기획실", 8: "로컬락 플랫폼", 7: "비어 있음", 6: "비어 있음", 5: "비어 있음", 4: "비어 있음", 3: "비어 있음",

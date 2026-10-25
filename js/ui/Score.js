@@ -1,4 +1,4 @@
-import { esc } from "../util/dom.js";
+import { esc } from "../util/dom.js?v=202610251159";
 
 /** 1~5점 평가 버튼. kind: "work"(팀원 결과물) | "report"(조직장 보고서). */
 export function scoreButtons(kind, id, current) {

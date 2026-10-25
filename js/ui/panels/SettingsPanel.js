@@ -1,4 +1,4 @@
-import { show } from "../../util/dom.js";
+import { show } from "../../util/dom.js?v=202610251159";
 
 /** 설정: the company's own AI keys, profile for ID/password recovery, password, CEO look. */
 export class SettingsPanel {

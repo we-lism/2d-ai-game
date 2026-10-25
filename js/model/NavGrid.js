@@ -1,4 +1,4 @@
-import { Building } from "./Layout.js";
+import { Building } from "./Layout.js?v=202610251159";
 
 const CELL = 10;
 const COLS = Building.W / CELL, ROWS = Building.H / CELL;

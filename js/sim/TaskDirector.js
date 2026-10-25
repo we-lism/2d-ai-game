@@ -1,5 +1,5 @@
-import { Act } from "./Actor.js";
-import { rnd } from "../util/random.js";
+import { Act } from "./Actor.js?v=202610251159";
+import { rnd } from "../util/random.js?v=202610251159";
 
 const ACTIVE = new Set(["queued", "assigning", "working", "reporting"]);
 

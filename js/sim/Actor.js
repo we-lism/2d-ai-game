@@ -1,4 +1,4 @@
-import { ri, rnd } from "../util/random.js";
+import { ri, rnd } from "../util/random.js?v=202610251159";
 
 /** Action builders used by schedules and task scripts. */
 export const Act = {

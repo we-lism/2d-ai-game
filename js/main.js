@@ -1,8 +1,8 @@
-import { $ } from "./util/dom.js";
-import { Api } from "./data/Api.js";
-import { GameStore } from "./data/Store.js";
-import { AuthScreen, PasswordScreen, ProfileScreen, CeoScreen } from "./ui/AuthScreens.js";
-import { GameScreen } from "./ui/GameScreen.js";
+import { $ } from "./util/dom.js?v=202610251159";
+import { Api } from "./data/Api.js?v=202610251159";
+import { GameStore } from "./data/Store.js?v=202610251159";
+import { AuthScreen, PasswordScreen, ProfileScreen, CeoScreen } from "./ui/AuthScreens.js?v=202610251159";
+import { GameScreen } from "./ui/GameScreen.js?v=202610251159";
 
 /** Wires the screens together and decides where a signed-in player should land. */
 class App {

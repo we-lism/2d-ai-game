@@ -1,8 +1,8 @@
-import { Emitter } from "../core/Emitter.js";
-import { Actor, Act } from "./Actor.js";
-import { NavGrid } from "../model/NavGrid.js";
-import { Building, ROOM_KINDS } from "../model/Layout.js";
-import { pick, ri } from "../util/random.js";
+import { Emitter } from "../core/Emitter.js?v=202610251159";
+import { Actor, Act } from "./Actor.js?v=202610251159";
+import { NavGrid } from "../model/NavGrid.js?v=202610251159";
+import { Building, ROOM_KINDS } from "../model/Layout.js?v=202610251159";
+import { pick, ri } from "../util/random.js?v=202610251159";
 
 const ENTRANCE = { x: 530, y: 566 };
 

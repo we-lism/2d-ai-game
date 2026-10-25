@@ -1,11 +1,11 @@
-import { Modal } from "./Modal.js";
-import { esc, show, fmtTime } from "../util/dom.js";
-import { PersonSprite } from "../render/PersonSprite.js";
-import { CandidateFactory, HAIR_STYLES, EYE_STYLES } from "../model/Look.js";
-import { Building } from "../model/Layout.js";
-import { nextRank, UNIT_TYPES } from "../model/Organization.js";
-import { Mbti } from "../model/Mbti.js";
-import { scoreButtons, handleScoreClick } from "./Score.js";
+import { Modal } from "./Modal.js?v=202610251159";
+import { esc, show, fmtTime } from "../util/dom.js?v=202610251159";
+import { PersonSprite } from "../render/PersonSprite.js?v=202610251159";
+import { CandidateFactory, HAIR_STYLES, EYE_STYLES } from "../model/Look.js?v=202610251159";
+import { Building } from "../model/Layout.js?v=202610251159";
+import { nextRank, UNIT_TYPES } from "../model/Organization.js?v=202610251159";
+import { Mbti } from "../model/Mbti.js?v=202610251159";
+import { scoreButtons, handleScoreClick } from "./Score.js?v=202610251159";
 
 const STATUS = { queued: "비서 전달 중", assigning: "업무 분배 회의", working: "수행 중", reporting: "팀장 취합 중", done: "보고 완료", error: "오류" };
 const skinName = (hex) => ["아주 밝은", "밝은", "중간", "구릿빛", "갈색", "짙은"][["#f6d7bd", "#eec39f", "#dcaa80", "#c48a5e", "#9a6640", "#6e4528"].indexOf(hex)] || "";
@@ -160,7 +160,7 @@ export class EmployeeDialog extends Modal {
     const boss = (() => { const t = org.unit(p.unit_id); if (!t) return null; if (t.head_id && t.head_id !== p.id) return org.person(t.head_id); const parent = t.parent_id ? org.unit(t.parent_id) : null; return (parent ? org.head(parent) : null) || (!t.head_id ? org.secretary : null); })();
     this.title = `${p.name} · ${org.title(p)}`;
     const barCls = u.rate >= 100 ? "full" : u.rate >= 80 ? "warn" : "";
-    this.body.innerHTML = `<div class="emp-head">
+    this.body.innerHTML = `${p.role === "ceo" ? "" : this.postBox(p)}<div class="emp-head">
         <canvas width="120" height="150" class="portrait small" aria-label="${esc(p.name)} 얼굴"></canvas>
         <div class="emp-facts">
           <div class="kv"><span>지금 위치</span><b>${esc(this.where())}</b></div>
@@ -184,7 +184,6 @@ export class EmployeeDialog extends Modal {
           <small>누적 ${p.total_points || 0}점 · 평가 ${perf.count}건${perf.avg != null ? ` · 평균 ${perf.avg}점` : ""}</small>
         </div></div>`}
       </div>
-      ${p.role === "ceo" ? "" : this.postBox(p)}
       <div class="tabs" role="tablist">
         <button role="tab" type="button" aria-selected="${this.tab === "now"}" data-tab="now">진행 중 업무 ${now.length}</button>
         <button role="tab" type="button" aria-selected="${this.tab === "hist"}" data-tab="hist">업무 이력 ${history.length}</button>

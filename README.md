@@ -19,3 +19,6 @@ Supabase 대시보드 → Edge Functions → Secrets
 - `OPENAI_API_KEY`
 - `GEMINI_API_KEY`
 - (선택) `OPENAI_MODEL` 기본 `gpt-6-luna`, `GEMINI_MODEL` 기본 `gemini-3.8-flash`
+
+## 배포 전 캐시 갱신
+코드를 고친 뒤 `python3 tools/stamp.py`를 실행하고 커밋하세요. 모든 JS·CSS 주소에 버전이 붙어, 브라우저가 새 코드를 바로 불러옵니다.

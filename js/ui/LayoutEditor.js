@@ -1,6 +1,6 @@
-import { $, esc, show } from "../util/dom.js";
-import { Iso } from "../render/Iso.js";
-import { Building, Room, Item, ITEM_SPECS, ROOM_KINDS } from "../model/Layout.js";
+import { $, esc, show } from "../util/dom.js?v=202610251159";
+import { Iso } from "../render/Iso.js?v=202610251159";
+import { Building, Room, Item, ITEM_SPECS, ROOM_KINDS } from "../model/Layout.js?v=202610251159";
 
 const SNAP = 10;
 const snap = (v) => Math.round(v / SNAP) * SNAP;
