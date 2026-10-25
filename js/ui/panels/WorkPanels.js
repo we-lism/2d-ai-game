@@ -16,7 +16,7 @@ export class OrderPanel {
       <form id="f-order" class="stack">
         <div class="field"><label for="od-team">담당 조직</label><select id="od-team"></select></div>
         <div class="role-preview" id="od-role"></div>
-        <div class="field"><label for="od-text">지시 내용</label><textarea id="od-text" maxlength="4000" required placeholder="예) 다음 달 협력 마을 방문 일정 초안을 3안으로 만들어 주세요."></textarea></div>
+        <div class="field"><label for="od-text">지시 내용</label><textarea id="od-text" maxlength="4000" placeholder="예) 다음 달 협력 마을 방문 일정 초안을 3안으로 만들어 주세요."></textarea></div>
         <button class="btn primary" type="submit" id="od-btn">비서실에 전달</button>
         <div id="od-msg" hidden></div>
       </form>
@@ -30,7 +30,8 @@ export class OrderPanel {
     const units = org.orderable.sort((a, b) => ["dept", "section", "team"].indexOf(a.type) - ["dept", "section", "team"].indexOf(b.type));
     this.sel.innerHTML = units.length ? units.map((u) => `<option value="${u.id}">[${TYPE[u.type]}] ${esc(org.path(u))} · ${u.head_id ? esc(org.head(u)?.name || "") + " " + esc(UNIT_HEAD[u.type]) : "1인 팀"}</option>`).join("") : `<option value="">지시를 받을 조직이 없습니다</option>`;
     if (keep && units.some((u) => String(u.id) === keep)) this.sel.value = keep;
-    this.root.querySelector("#od-btn").disabled = !units.length;
+    this.root.querySelector("#od-btn").disabled = false;   // always clickable; if nobody can take it, say why
+    const m = this.root.querySelector("#od-msg"); if (units.length && m.textContent.startsWith("지시를 받을 조직이")) m.hidden = true;
     this.preview();
   }
   /** Shows the chain this order will travel. */
@@ -44,14 +45,31 @@ export class OrderPanel {
   preview() {
     const org = this.store.org; const u = org.unit(+this.sel.value);
     const box = this.root.querySelector("#od-role");
-    if (!u) { box.textContent = "조직 탭에서 팀을 만들고 직원을 넣으세요. 1명뿐인 팀은 그 직원이 직접 맡고, 2명 이상이면 팀장을 임명해야 합니다."; return; }
+    if (!u) { box.textContent = this.whyNone(); return; }
     const sec = org.secretary;
     const ex = u.type === "dept" ? org.executives.find((p) => (p.oversees || []).map(Number).includes(u.id)) : null;
     box.textContent = `전달 경로: 사장 → 비서실장(${sec ? sec.name : "공석·AI 대행"}) →${ex ? `\n담당 임원 ${ex.name} ${ex.rank} →` : ""}\n${this.chain(u)}\n기본 업무: ${u.role_text?.trim() || "미지정 (방 이름표나 조직 탭에서 입력)"}`;
   }
+  /** Why no unit can take an order yet, in concrete steps. */
+  whyNone() {
+    const org = this.store.org;
+    const free = org.staff.filter((p) => p.role === "staff" && !p.unit_id && !(p.oversees || []).length);
+    const lines = ["지시를 받을 조직이 아직 없습니다."];
+    for (const u of org.units) {
+      const n = org.people.filter((x) => x.unit_id === u.id && x.role === "staff").length;
+      if (u.type === "team") lines.push(`- ${u.name}: 직원 ${n}명${n === 0 ? " → 직원을 넣으세요" : n >= 2 ? " → 팀장을 임명하세요" : ""}`);
+      else lines.push(`- ${TYPE[u.type]} ${u.name}: 책임자 공석 → 조직 탭에서 임명`);
+    }
+    if (!org.units.length) lines.push("- 방 이름표를 누르고 '이 방으로 새 팀 만들기'를 하세요.");
+    if (free.length) lines.push(`- 소속 없는 직원: ${free.map((p) => p.name).join(", ")}`);
+    lines.push("직원 1명뿐인 팀은 그 직원이 바로 지시를 받습니다. 2명 이상이면 팀장 임명이 필요합니다.");
+    return lines.join("\n");
+  }
   async submit() {
     const msg = this.root.querySelector("#od-msg"), btn = this.root.querySelector("#od-btn");
-    const text = this.root.querySelector("#od-text").value.trim(); if (!text || !this.sel.value) return;
+    const text = this.root.querySelector("#od-text").value.trim();
+    if (!this.sel.value) { show(msg, this.whyNone(), "warn"); return; }
+    if (!text) { show(msg, "지시 내용을 입력하세요.", "warn"); this.root.querySelector("#od-text").focus(); return; }
     btn.disabled = true; show(msg, "비서실에 전달 중…");
     try {
       const r = await this.store.api.issue(+this.sel.value, text);

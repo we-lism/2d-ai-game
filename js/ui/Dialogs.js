@@ -212,7 +212,11 @@ export class RoomDialog extends Modal {
     Object.assign(this, { store, floor, room });
     this.unitId = room.unit_id || null;   // no live re-render: polling must not wipe what the CEO is typing
     this.body.addEventListener("click", (e) => this.click(e));
-    this.body.addEventListener("change", (e) => { if (e.target.id === "rm-unit") { this.unitId = e.target.value ? +e.target.value : null; this.render(); } });
+    this.body.addEventListener("change", (e) => {
+      if (e.target.id === "rm-unit") { this.unitId = e.target.value ? +e.target.value : null; this.render(); }
+      if (e.target.id === "rm-add" && e.target.value) this.act(() => store.api.setMember(+e.target.value, this.unitId), "직원을 넣었습니다.");
+      if (e.target.id === "rm-head" && e.target.value) this.act(() => store.api.appoint(+e.target.value, this.unitId), "팀장을 임명했습니다.");
+    });
     this.render();
   }
   render() {
@@ -228,7 +232,9 @@ export class RoomDialog extends Modal {
       ${u ? `
         <div class="room-card">
           <div class="kv"><span>책임자 (${esc(T.head)})</span>${head ? `<b>${esc(head.name)} ${esc(head.rank)}</b>${head.mbti ? ` <small class="muted">${esc(head.mbti)} · ${esc(Mbti.info(head.mbti)?.style || "")}</small>` : ""}` : `<b class="muted">공석</b> <small class="muted">${esc(rule.text)}</small>`}</div>
-          ${u.type === "team" ? `<div class="kv"><span>팀원</span><b>${members.map((m) => esc(m.name)).join(", ") || "없음"}</b></div>` : `<div class="kv"><span>하위 조직</span><b>${org.children(u).map((c) => esc(c.name)).join(", ") || "없음"}</b></div>`}
+          ${u.type === "team" ? `<div class="kv"><span>소속 직원</span><b>${org.people.filter((x) => x.unit_id === u.id && x.role === "staff").map((m) => esc(m.name)).join(", ") || "없음"}</b></div>
+          <div class="kv"><span>직원 넣기</span><select id="rm-add"><option value="">선택…</option>${org.staff.filter((x) => x.role === "staff" && x.unit_id !== u.id && !(x.oversees || []).length && !org.ledBy(x).length).map((x) => `<option value="${x.id}">${esc(x.name)} (${esc(x.rank)}${x.unit_id ? " · " + esc(org.unit(x.unit_id)?.name || "") : " · 소속 없음"})</option>`).join("")}</select></div>
+          ${rule.ok && !head ? `<div class="kv"><span>팀장 임명</span><select id="rm-head"><option value="">선택…</option>${org.eligibleHeads(u).map((x) => `<option value="${x.id}">${esc(x.name)} (${esc(x.rank)})</option>`).join("")}</select></div>` : ""}` : `<div class="kv"><span>하위 조직</span><b>${org.children(u).map((c) => esc(c.name)).join(", ") || "없음"}</b></div>`}
           <div class="field"><label for="rm-role">이 방이 하는 업무 (책임자가 이 범위로 업무를 나누고, 팀원 질문에 답합니다)</label>
             <textarea id="rm-role" maxlength="4000" rows="5" placeholder="예) 로컬 플랫폼 기획·운영. 결과물: 기획서·운영 지표. 범위 밖 요청은 비서실에 확인.">${esc(u.role_text || "")}</textarea></div>
           <div class="kv"><span>사용 AI</span><select id="rm-engine"><option value="openai" ${u.engine === "openai" ? "selected" : ""}>ChatGPT</option><option value="gemini" ${u.engine === "gemini" ? "selected" : ""}>Gemini</option></select></div>
@@ -240,6 +246,15 @@ export class RoomDialog extends Modal {
     this.foot.querySelector("[data-newteam]")?.addEventListener("click", () => this.newTeam());
   }
   click() {}
+  /** Org change from inside the dialog; keeps whatever was typed in the work box. */
+  async act(fn, ok) {
+    const role = this.body.querySelector("#rm-role")?.value, name = this.body.querySelector("#rm-name")?.value;
+    try { await fn(); await this.store.refresh(false); this.store.emit("toast", ok); }
+    catch (e) { this.store.emit("toast", e.friendly || e.message); }
+    this.render();
+    if (role != null && this.body.querySelector("#rm-role")) this.body.querySelector("#rm-role").value = role;
+    if (name != null) this.body.querySelector("#rm-name").value = name;
+  }
   async newTeam() {
     try {
       const r = await this.store.api.saveUnit({ type: "team", name: this.body.querySelector("#rm-name").value || this.room.name });
