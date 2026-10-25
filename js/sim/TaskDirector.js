@@ -45,11 +45,11 @@ export class TaskDirector {
   apply(initial = false) {
     for (const ins of this.store.instructions) {
       const prev = this.seen.get(ins.id);
-      const snap = { status: ins.status, urs: new Map((ins.units || []).map((u) => [u.id, u.status])), asg: new Map((ins.assignments || []).map((a) => [a.id, a.status])) };
+      const snap = { status: ins.status, urs: new Map((ins.units || []).map((u) => [u.id, u.status])), asg: new Map((ins.assignments || []).map((a) => [a.id, a.status])), qa: new Map((ins.assignments || []).map((a) => [a.id, a.qa || ""])) };
       this.seen.set(ins.id, snap);
       if (initial) continue;                          // people already in place via home(); no replay
       if (!prev) { this.onNew(ins); }
-      const before = prev || { status: "queued", urs: new Map(), asg: new Map() };
+      const before = prev || { status: "queued", urs: new Map(), asg: new Map(), qa: new Map() };
       for (const ur of ins.units || []) {
         const was = before.urs.get(ur.id);
         if (!was) this.onUnitStart(ins, ur);
@@ -59,6 +59,8 @@ export class TaskDirector {
       for (const a of ins.assignments || []) {
         const was = before.asg.get(a.id);
         if (!was) this.onAssigned(ins, a);
+        const qa = a.qa || "", qaWas = before.qa?.get(a.id) || "";
+        if (qa && qa !== qaWas && a.status === "working") this.onQuestion(ins, a, /\n답변[:：]/.test(qa), !qaWas);
         if (was !== "done" && was !== "error" && (a.status === "done" || a.status === "error")) this.onAssignDone(ins, a);
       }
       if (before.status !== ins.status && ins.status === "done") this.onDone(ins);
@@ -69,7 +71,7 @@ export class TaskDirector {
       this.reports.set(r.report_date, r.created_at);
     }
   }
-  remember(ins) { this.seen.set(ins.id, { status: ins.status, urs: new Map(), asg: new Map() }); }
+  remember(ins) { this.seen.set(ins.id, { status: ins.status, urs: new Map(), asg: new Map(), qa: new Map() }); }
 
   /* ---------- scenes ---------- */
   onNew(ins) {
@@ -81,7 +83,7 @@ export class TaskDirector {
       const n = this.near(boss, 40);
       this.script(sec, [Act.go(n.floor, n.point, { exact: true }), Act.wait(2500, "지시 받아 적는 중"), this.sim.goHome(this.actor(sec)),
         Act.wait(2500, head ? `호출: ${head.name} ${head.rank}` : "담당 호출"),
-        Act.call(() => { if (head) this.say(head, "비서실 호출 받음"); this.log(`비서 ${sec.name} → ${unit?.name} ${head?.name ?? ""} 전달`); })]);
+        Act.call(() => { if (head) this.say(head, "비서실 호출 받음"); this.log(`비서실장 ${sec.name} → ${unit?.name} ${head?.name ?? ""} 전달`); })]);
     } else if (head) this.say(head, "사장실 호출 받음");
   }
 
@@ -117,6 +119,27 @@ export class TaskDirector {
       this.sim.goHome(this.actor(p)),                // task > 0 → their desk
       Act.wait(6000, "작업: " + a.task, () => this.asgStatus(ins.id, a.id) !== "working", 300000),
     ]);
+  }
+
+  /** A member who lacks information walks to the head; the head answers within the assigned scope. */
+  onQuestion(ins, a, answered, fresh = true) {
+    const p = this.person(a.character_id); if (!p) return;
+    const ur = (ins.units || []).find((u) => u.id === a.unit_report_id);
+    const head = this.person(ur?.head_id); if (!head || head.id === p.id) return;
+    if (!answered) {
+      this.log(`${p.name} → ${head.name} ${head.rank}에게 질문`);
+      const n = this.near(head, 28);
+      this.script(p, [Act.say("질문 있습니다", 2000), Act.go(n.floor, n.point, { exact: true }),
+        Act.wait(4000, "업무 범위 질문 중", () => /\n답변[:：]/.test((this.ins(ins.id)?.assignments || []).find((x) => x.id === a.id)?.qa || "") || this.asgStatus(ins.id, a.id) !== "working", 200000)]);
+      this.script(head, [Act.wait(4000, `${p.name} 질문 검토`, () => /\n답변[:：]/.test((this.ins(ins.id)?.assignments || []).find((x) => x.id === a.id)?.qa || "") || this.asgStatus(ins.id, a.id) !== "working", 200000)]);
+    } else {
+      this.log(`${head.name} ${head.rank} → ${p.name} 답변`);
+      const n = this.near(head, 28);
+      // question and answer can land in one poll: still walk over and ask first
+      const ask = fresh ? [Act.say("질문 있습니다", 1800), Act.go(n.floor, n.point, { exact: true }), Act.wait(2500, "업무 범위 질문 중")] : [];
+      this.script(p, [...ask, Act.call(() => this.say(head, "업무 범위 안에서 답변", 3000)), Act.wait(2500, "답변 확인"), this.sim.goHome(this.actor(p)),
+        Act.wait(6000, "작업: " + a.task, () => this.asgStatus(ins.id, a.id) !== "working", 300000)]);
+    }
   }
 
   onAssignDone(ins, a) {

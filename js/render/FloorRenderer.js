@@ -121,7 +121,7 @@ export class FloorRenderer {
 
   /* ---------- frame ---------- */
   /** editor: optional LayoutEditor (draws its draft + selection instead of the saved layout). */
-  draw({ editor = null, selectedId = null, hoverDesk = null, marker = null } = {}) {
+  draw({ editor = null, selectedId = null, hoverDesk = null, hoverRoom = null, marker = null } = {}) {
     const g = this.g, T = this.T, cam = this.cam, f = this.floor;
     const layout = editor?.active ? editor.draft : this.store.layout(f);
     g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = T.bg; g.fillRect(0, 0, this.cv.width, this.cv.height);
@@ -166,7 +166,13 @@ export class FloorRenderer {
     if (editor?.active) editor.drawOver(this);
 
     // labels
-    for (const r of layout.rooms) this.label(Iso.P(r.x + r.w / 2, r.y + 4, r.y > 32 ? TALL + 10 : OUTER + 8), r.name, T.ink, T.panel);
+    this.roomHits = [];
+    for (const r of layout.rooms) {
+      const unit = r.unit_id ? this.store.org.unit(r.unit_id) : null;
+      const text = unit && unit.name !== r.name ? `${r.name} · ${unit.name}` : r.name;
+      const box = this.label(Iso.P(r.x + r.w / 2, r.y + 4, r.y > 32 ? TALL + 10 : OUTER + 8), text, T.ink, unit ? T.amber : T.panel, hoverRoom === r);
+      if (!editor?.active) this.roomHits.push({ room: r, ...box });
+    }
     if (!layout.rooms.length && !editor?.active) this.label(Iso.P(520, 300, 4), "비어 있는 층 · 공간 편집으로 꾸며보세요", T.muted, T.panel);
     this.label(Iso.P(t.stairsN.x + 40, t.stairsN.y, OUTER + 8), "비상구 · 북", "#ffffff", T.accent);
     this.label(Iso.P(t.stairsS.x + 40, t.stairsS.y + t.stairsS.h, TALL + 10), "비상구 · 남", "#ffffff", T.accent);
@@ -184,11 +190,20 @@ export class FloorRenderer {
     }
   }
 
-  label([x, y], text, ink, bg) {
+  /** Draws a name tag and returns its box in world coordinates (used to click room tags). */
+  label([x, y], text, ink, bg, hot = false) {
     const g = this.g, px = (n) => this.cam.px(n);
     g.font = `700 ${px(11)}px ${FF}`; const w = g.measureText(text).width + px(12), h = px(18);
     g.fillStyle = bg; g.beginPath(); g.roundRect ? g.roundRect(x - w / 2, y - h, w, h, px(4)) : g.rect(x - w / 2, y - h, w, h); g.fill();
+    if (hot) { g.strokeStyle = this.T.accent; g.lineWidth = px(2); g.stroke(); }
     g.fillStyle = ink; g.textAlign = "center"; g.fillText(text, x, y - px(5)); g.textAlign = "left";
+    return { x0: x - w / 2, y0: y - h, x1: x + w / 2, y1: y };
+  }
+  /** Room whose name tag is under the pointer. */
+  roomLabelAt(clientX, clientY) {
+    const [wx, wy] = this.cam.toWorld(clientX, clientY);
+    const pad = this.cam.px(3);
+    return (this.roomHits || []).findLast?.((b) => wx >= b.x0 - pad && wx <= b.x1 + pad && wy >= b.y0 - pad && wy <= b.y1 + pad)?.room || null;
   }
   bubble(x, y, text) {
     const g = this.g, px = (n) => this.cam.px(n), T = this.T;

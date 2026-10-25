@@ -5,7 +5,7 @@ import { TaskDirector } from "../sim/TaskDirector.js";
 import { FloorRenderer } from "../render/FloorRenderer.js";
 import { Iso, Camera } from "../render/Iso.js";
 import { LayoutEditor } from "./LayoutEditor.js";
-import { HireDialog, FireDialog, DeskDialog, EmployeeDialog, ElevatorDialog } from "./Dialogs.js";
+import { HireDialog, FireDialog, DeskDialog, EmployeeDialog, ElevatorDialog, RoomDialog } from "./Dialogs.js";
 import { Act } from "../sim/Actor.js";
 import { OrderPanel, ProgressPanel, ReportsPanel } from "./panels/WorkPanels.js";
 import { OrgPanel } from "./panels/OrgPanel.js";
@@ -112,8 +112,9 @@ export class GameScreen {
       }
       if (!this.editor.active) {
         const onActor = !!this.renderer.actorAt(e.clientX, e.clientY);
-        const it = this.renderer.itemAt(e.clientX, e.clientY); this.hoverDesk = it?.type === "desk" && !onActor ? it : null;
-        cv.style.cursor = this.hoverDesk || onActor || this.isElevatorClick(e.clientX, e.clientY) ? "pointer" : "crosshair";
+        this.hoverRoom = onActor ? null : this.renderer.roomLabelAt(e.clientX, e.clientY);
+        const it = this.hoverRoom ? null : this.renderer.itemAt(e.clientX, e.clientY); this.hoverDesk = it?.type === "desk" && !onActor ? it : null;
+        cv.style.cursor = this.hoverDesk || this.hoverRoom || onActor || this.isElevatorClick(e.clientX, e.clientY) ? "pointer" : "crosshair";
       }
     });
     cv.addEventListener("pointerup", (e) => {
@@ -122,12 +123,14 @@ export class GameScreen {
       if (d.moved) return;
       const a = this.renderer.actorAt(e.clientX, e.clientY);
       if (a) { this.selected = a.id; cam.follow = cam.z > Camera.FIT; this.openPerson(a.id); return; }
+      const room = this.renderer.roomLabelAt(e.clientX, e.clientY);
+      if (room) { new RoomDialog(this.store, this.floor, room).open(); return; }
       const it = this.renderer.itemAt(e.clientX, e.clientY);
       if (it?.type === "desk") { new DeskDialog(this.store, this.floor, it).open(); return; }
       if (this.isElevatorClick(e.clientX, e.clientY)) { this.openElevator(); return; }
       this.moveCeoTo(this.floor, this.renderer.cam.toPlan(e.clientX, e.clientY));
     });
-    cv.addEventListener("pointerleave", () => { this.hoverDesk = null; });
+    cv.addEventListener("pointerleave", () => { this.hoverDesk = null; this.hoverRoom = null; });
     cv.addEventListener("wheel", (e) => {
       if (!e.ctrlKey && cam.z <= Camera.FIT && e.deltaY > 0) return;
       e.preventDefault(); const [wx, wy] = cam.toWorld(e.clientX, e.clientY); cam.zoom(cam.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15), wx, wy);
@@ -151,7 +154,7 @@ export class GameScreen {
       const dt = Math.min(100, t - (this.last || t)); this.last = t;
       this.sim.tick(dt);
       this.renderer.floor = this.floor;
-      this.renderer.draw({ editor: this.editor, selectedId: this.selected, hoverDesk: this.hoverDesk, marker: this.marker });
+      this.renderer.draw({ editor: this.editor, selectedId: this.selected, hoverDesk: this.hoverDesk, hoverRoom: this.hoverRoom, marker: this.marker });
       if ((this.tickN = (this.tickN || 0) + 1) % 15 === 0) { $("#clock", this.root).textContent = this.sim.clock; $("#dayLabel", this.root).textContent = `${this.sim.day}일차 · 게임 시각`; this.building.render(this.floor); }
       this.raf = requestAnimationFrame(frame);
     };

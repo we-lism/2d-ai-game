@@ -352,3 +352,20 @@ canvas#floorCanvas{cursor:crosshair}
 .small-link{font-size:12px;margin-left:4px}
 .perf-col{display:grid;gap:8px}
 .perf-num small{font-size:13px;color:var(--muted);font-weight:500}
+
+/* MBTI work style + compatibility */
+.mbti-style { font-size: 12px; font-weight: 600; color: var(--accent); margin-left: 4px; }
+.mbti-box { margin-top: 4px; font-size: 12px; line-height: 1.55; color: var(--ink); }
+.mbti-box > div { margin: 1px 0; }
+.mbti-kv { align-items: flex-start; }
+.fit { display: inline-block; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 4px; margin-right: 4px; }
+.fit.good { background: color-mix(in srgb, #2f8a5c 18%, transparent); color: #2f8a5c; }
+.fit.bad { background: color-mix(in srgb, #b8483e 18%, transparent); color: #b8483e; }
+.fit.normal { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--muted); }
+.fit-boss { margin-top: 4px; font-size: 12px; }
+/* room dialog */
+.room-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; display: grid; gap: 8px; }
+.room-card textarea { width: 100%; }
+.share-list { margin: 4px 0 10px 18px; padding: 0; font-size: 12.5px; line-height: 1.6; }
+details.qa pre { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.room-card .kv { gap: 8px; }

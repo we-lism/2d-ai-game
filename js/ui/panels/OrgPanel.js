@@ -1,5 +1,6 @@
 import { esc, show } from "../../util/dom.js";
 import { UNIT_TYPES } from "../../model/Organization.js";
+import { Building } from "../../model/Layout.js";
 
 /**
  * 조직: build 부 › 과 › 팀, put people in teams, appoint heads when the rule allows,
@@ -50,6 +51,7 @@ export class OrgPanel {
     const parents = T.parent ? org.ofType(T.parent) : [];
     const eligible = org.eligibleHeads(u).filter((p) => p.id !== u.head_id);
     const members = u.type === "team" ? org.members(u) : [];
+    const room = this.roomOf(u.id);
     const addable = org.staff.filter((p) => p.role === "staff" && p.unit_id !== u.id && !(p.oversees || []).length && !org.ledBy(p).length);
     return `<article class="unit" style="--depth:${depth}" data-unit="${u.id}">
       <header>
@@ -64,11 +66,16 @@ export class OrgPanel {
       ${u.type === "team" ? `
         <div class="members">${members.map((p) => `<span class="chip"><button type="button" class="linkish" data-person="${p.id}">${esc(p.name)}</button><button type="button" class="chip-x" aria-label="${esc(p.name)} 팀에서 빼기" data-unmember="${p.id}">×</button></span>`).join("") || `<span class="hint">팀원이 없습니다.</span>`}</div>
         <div class="kv"><span>팀원 추가</span><select data-field="member" aria-label="팀원 추가"><option value="">선택…</option>${addable.map((p) => `<option value="${p.id}">${esc(p.name)}${p.unit_id ? " (" + esc(org.unit(p.unit_id)?.name || "") + ")" : ""}</option>`).join("")}</select></div>
-        <div class="field"><label>팀 역할 (팀장이 업무를 나누는 기준)</label><textarea data-field="role" maxlength="4000" placeholder="예) 플랫폼 기획·개발·제휴 영업 담당">${esc(u.role_text)}</textarea></div>
-        <div class="row-between"><select data-field="engine" aria-label="사용 AI"><option value="openai" ${u.engine === "openai" ? "selected" : ""}>ChatGPT</option><option value="gemini" ${u.engine === "gemini" ? "selected" : ""}>Gemini</option></select><button type="button" class="btn small" data-saverole="${u.id}">역할 저장</button></div>` : ""}
+` : ""}
+      <div class="field"><label>담당 업무 (${T.head}이 이 범위로 업무를 나누고 질문에 답합니다)${room ? ` · 방: ${esc(room)}` : ""}</label><textarea data-field="role" maxlength="4000" placeholder="예) 플랫폼 기획·개발·제휴 영업 담당">${esc(u.role_text)}</textarea></div>
+      <div class="row-between"><select data-field="engine" aria-label="사용 AI"><option value="openai" ${u.engine === "openai" ? "selected" : ""}>ChatGPT</option><option value="gemini" ${u.engine === "gemini" ? "selected" : ""}>Gemini</option></select><button type="button" class="btn small" data-saverole="${u.id}">업무 저장</button></div>
     </article>`;
   }
 
+  roomOf(unitId) {
+    for (const f of Building.floors) { const r = this.store.layout(f).rooms.find((x) => x.unit_id === unitId); if (r) return `${Building.label(f)} ${r.name}`; }
+    return "";
+  }
   msg(t, k) { show(this.root.querySelector("#org-msg"), t, k); }
   async run(fn, okText) {
     try { const r = await fn(); await this.store.refresh(false); if (r && r.ok === false && r.reason === "RULE") this.msg(`규칙을 아직 채우지 못했습니다 (${r.have}/${r.need}).`, "warn"); else if (okText) this.store.emit("toast", okText); }
@@ -85,7 +92,7 @@ export class OrgPanel {
     const um = t.closest("[data-unmember]"); if (um) return this.run(() => api.setMember(+um.dataset.unmember, null));
     const per = t.closest("[data-person]"); if (per) return this.onPerson?.(+per.dataset.person);
     const sr = t.closest("[data-saverole]");
-    if (sr) { const card = sr.closest(".unit"); return this.run(() => api.saveUnit({ id: +sr.dataset.saverole, role_text: card.querySelector('[data-field="role"]').value, engine: card.querySelector('[data-field="engine"]').value }), "팀 역할을 저장했습니다."); }
+    if (sr) { const card = sr.closest(".unit"); return this.run(() => api.saveUnit({ id: +sr.dataset.saverole, role_text: card.querySelector('[data-field="role"]').value, engine: card.querySelector('[data-field="engine"]').value }), "담당 업무를 저장했습니다."); }
     if (t.closest("[data-exec]")) {
       const pid = +this.root.querySelector("#ex-person").value; const depts = [...this.root.querySelectorAll(".ex-dept:checked")].map((c) => +c.value);
       if (!pid) return this.msg("임원 후보를 고르세요.", "warn");

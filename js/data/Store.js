@@ -43,8 +43,12 @@ export class GameStore extends Emitter {
     return out;
   }
   /* 성실함 = today's AI tokens ÷ daily limit */
-  limitOf(p) { return p?.daily_limit || this.defaultLimit || 50000; }
-  usage(p) { const used = p?.used_today || 0, limit = this.limitOf(p); return { used, limit, rate: Math.min(999, Math.round((used / limit) * 100)) }; }
+  /** Company daily AI budget × the person's share (or their own override). */
+  limitOf(p) { return p?.daily_limit || Math.max(1, Math.round((this.defaultLimit || 500000) * (p?.role ? this.org.share(p).pct : 0.10))); }
+  usage(p) {
+    const used = p?.used_today || 0, limit = this.limitOf(p), sh = p?.role ? this.org.share(p) : { hard: true, label: "팀원 10%" };
+    return { used, limit, hard: sh.hard, share: sh.label, rate: Math.min(999, Math.round((used / limit) * 100)) };
+  }
 
   /** An assignment this person is working on right now. */
   activeWork(p) {
@@ -87,7 +91,7 @@ export class GameStore extends Emitter {
       const saved = new Map((st.floors || []).map((f) => [f.floor, f.layout]));
       for (const f of Building.floors) this.layouts.set(f, FloorLayout.from(f, saved.get(f)));
     }
-    this.defaultLimit = st.default_limit || this.defaultLimit || 50000;
+    this.defaultLimit = st.default_limit || this.defaultLimit || 500000;
     this.units = st.units || [];
     this.characters = st.characters || [];
     this.instructions = st.instructions || [];

@@ -53,6 +53,13 @@ export class Organization {
     if (u?.type === "team" && !u.head_id && this.people.filter((x) => x.unit_id === u.id && x.role === "staff").length === 1) return `${u.name} (1인 팀)`;
     return u ? `${u.name} 소속` : "소속 없음";
   }
+  /** Share of the company's daily AI budget: 비서실 3%, 조직 책임자·임원 5% (규제 없음), 팀원 10% (한도 적용). */
+  share(p) {
+    if (!p || p.role === "ceo") return { pct: 0, hard: false, label: "대표" };
+    if (p.role === "secretary") return { pct: 0.03, hard: false, label: "비서실 3%" };
+    if (this.ledBy(p).length || (p.oversees || []).length) return { pct: 0.05, hard: false, label: "책임자 5%" };
+    return { pct: 0.10, hard: true, label: "팀원 10%" };
+  }
   /** "대리 · 플랫폼팀 팀장" */
   title(p) { return p ? (p.role === "ceo" ? "사장" : `${p.rank} · ${this.position(p)}`) : ""; }
   /** Units that can take an order: a head, or a team of exactly one person. */

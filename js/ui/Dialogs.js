@@ -3,7 +3,8 @@ import { esc, show, fmtTime } from "../util/dom.js";
 import { PersonSprite } from "../render/PersonSprite.js";
 import { CandidateFactory, HAIR_STYLES, EYE_STYLES } from "../model/Look.js";
 import { Building } from "../model/Layout.js";
-import { nextRank } from "../model/Organization.js";
+import { nextRank, UNIT_TYPES } from "../model/Organization.js";
+import { Mbti } from "../model/Mbti.js";
 import { scoreButtons, handleScoreClick } from "./Score.js";
 
 const STATUS = { queued: "비서 전달 중", assigning: "업무 분배 회의", working: "수행 중", reporting: "팀장 취합 중", done: "보고 완료", error: "오류" };
@@ -31,7 +32,7 @@ export class HireDialog extends Modal {
       <dt>이름</dt><dd>${esc(c.name)}</dd><dt>성별</dt><dd>${c.gender}</dd>
       <dt>피부색</dt><dd><i class="sw" style="background:${c.look.skin}"></i>${skinName(c.look.skin)}</dd>
       <dt>얼굴</dt><dd>${HAIR_STYLES[c.look.hairStyle]} · ${EYE_STYLES[c.look.eyes]}</dd>
-      <dt>MBTI</dt><dd>${c.mbti}</dd><dt>직급</dt><dd>사원 <small class="muted">0 / 100점 → 주임</small></dd><dt>성실함</dt><dd><span class="mono">0%</span> <small class="muted">오늘 AI 사용량 ÷ 하루 한도 ${this.store.limitOf({}).toLocaleString()} 토큰</small></dd>`;
+      <dt>MBTI</dt><dd>${Mbti.html(c.mbti, esc)}</dd><dt>직급</dt><dd>사원 <small class="muted">0 / 100점 → 주임</small></dd><dt>성실함</dt><dd><span class="mono">0%</span> <small class="muted">오늘 AI 사용량 ÷ 하루 몫 ${this.store.limitOf({}).toLocaleString()} 토큰 (회사 하루 사용량의 10%)</small></dd>`;
   }
   async hire() {
     const btn = this.foot.querySelector("[data-hire]"); btn.disabled = true;
@@ -136,6 +137,7 @@ export class EmployeeDialog extends Modal {
       return `<article class="rep">
         <header><span class="pill ${a.status === "done" ? "done" : a.status === "error" ? "error" : "working"}">${W_LABEL[a.status]}</span><small>${fmtTime(h.at)}</small></header>
         <div class="rep-task"><b>맡은 일</b> ${esc(a.task)}</div><div class="sub">대표 지시: ${esc(ins.content)}</div>
+        ${a.qa ? `<details class="sum qa" open><summary>책임자에게 질문 · 답변</summary><pre>${esc(a.qa)}</pre></details>` : ""}
         ${a.result ? `<details class="sum"><summary>결과 보기</summary><pre>${esc(a.result)}</pre></details>` : ""}
         ${a.result && a.status === "done" ? scoreButtons("work", a.id, a.score) : ""}
       </article>`;
@@ -161,7 +163,7 @@ export class EmployeeDialog extends Modal {
         <canvas width="120" height="150" class="portrait small" aria-label="${esc(p.name)} 얼굴"></canvas>
         <div class="emp-facts">
           <div class="kv"><span>지금 위치</span><b>${esc(this.where())}</b></div>
-          <div class="kv"><span>MBTI</span><b>${esc(p.mbti || "-")}</b></div>
+          <div class="kv mbti-kv"><span>MBTI</span><div>${Mbti.html(p.mbti, esc)}${boss && boss.mbti && p.role !== "ceo" ? (() => { const f = Mbti.fit(p.mbti, boss.mbti); return f ? `<div class="fit-boss">보고 대상 ${esc(boss.name)}(${esc(boss.mbti)})와 <span class="fit ${f}">${Mbti.fitLabel(f)}</span></div>` : ""; })() : ""}</div></div>
           <div class="kv"><span>자리</span><b>${desk ? `${Building.label(desk.floor)} ${esc(this.store.layout(desk.floor).roomOf(desk.item)?.name || "")}` : p.role === "ceo" ? "사장실" : "배정 전"}</b></div>
           ${boss ? `<div class="kv"><span>보고 대상</span><b>${esc(boss.name)} ${esc(boss.rank)}</b></div>` : ""}
           ${(p.oversees || []).length ? `<div class="kv"><span>담당 부</span><b>${esc(p.oversees.map((id) => org.unit(+id)?.name).filter(Boolean).join(", "))}</b> <small class="muted">→ 비서실에 보고</small></div>` : ""}
@@ -170,8 +172,8 @@ export class EmployeeDialog extends Modal {
           <div class="label">성실함 (오늘 AI 사용률)</div>
           <div class="perf-num mono">${u.rate}%</div>
           <div class="bar ${barCls}"><b style="width:${Math.min(100, u.rate)}%"></b></div>
-          <small>${u.used.toLocaleString()} / ${u.limit.toLocaleString()} 토큰${u.rate >= 100 ? " · 오늘 한도 소진" : ""}</small>
-          <div class="kv"><input id="emp-limit" type="number" min="1000" step="1000" value="${p.daily_limit || ""}" placeholder="한도 ${this.store.defaultLimit.toLocaleString()}" class="num-in" aria-label="하루 한도"><button type="button" class="btn small" data-limit>한도 저장</button></div>
+          <small>${u.used.toLocaleString()} / ${u.limit.toLocaleString()} 토큰 · ${esc(u.share)}${u.hard ? (u.rate >= 100 ? " · 오늘 한도 소진" : " · 한도 적용") : " · 사용 규제 없음"}</small>
+          <div class="kv"><input id="emp-limit" type="number" min="1000" step="1000" value="${p.daily_limit || ""}" placeholder="몫 ${this.store.limitOf({ ...p, daily_limit: null }).toLocaleString()}" class="num-in" aria-label="개인 하루 몫"><button type="button" class="btn small" data-limit>개인 몫 저장</button></div>
         </div>
         <div class="perf">
           <div class="label">직급 · 승진 점수</div>
@@ -197,6 +199,75 @@ export class EmployeeDialog extends Modal {
       return;
     }
     await handleScoreClick(e, this.store);
+  }
+}
+
+/**
+ * Room click (its name tag): set what work this room does by linking it to an org unit.
+ * The unit's head is responsible for that work and splits it among the members.
+ */
+export class RoomDialog extends Modal {
+  constructor(store, floor, room) {
+    super(`${Building.label(floor)} 방 설정`, { wide: true });
+    Object.assign(this, { store, floor, room });
+    this.unitId = room.unit_id || null;   // no live re-render: polling must not wipe what the CEO is typing
+    this.body.addEventListener("click", (e) => this.click(e));
+    this.body.addEventListener("change", (e) => { if (e.target.id === "rm-unit") { this.unitId = e.target.value ? +e.target.value : null; this.render(); } });
+    this.render();
+  }
+  render() {
+    const org = this.store.org; const u = this.unitId ? org.unit(this.unitId) : null;
+    const T = u ? UNIT_TYPES[u.type] : null; const head = u ? org.head(u) : null; const rule = u ? org.rule(u) : null;
+    const members = u?.type === "team" ? org.members(u) : [];
+    const taken = new Map(); for (const f of Building.floors) for (const r of this.store.layout(f).rooms) if (r.unit_id && r !== this.room) taken.set(r.unit_id, `${Building.label(f)} ${r.name}`);
+    const lim = (pct) => Math.round(this.store.defaultLimit * pct).toLocaleString();
+    this.body.innerHTML = `
+      <div class="field"><label for="rm-name">방 이름</label><input id="rm-name" maxlength="30" value="${esc(this.room.name)}"></div>
+      <div class="field"><label for="rm-unit">이 방을 쓰는 조직</label>
+        <select id="rm-unit"><option value="">연결 안 함</option>${org.units.map((x) => `<option value="${x.id}" ${x.id === this.unitId ? "selected" : ""}>${esc(UNIT_TYPES[x.type].label)} · ${esc(org.path(x))}${taken.has(x.id) ? ` (현재 ${esc(taken.get(x.id))})` : ""}</option>`).join("")}</select></div>
+      ${u ? `
+        <div class="room-card">
+          <div class="kv"><span>책임자 (${esc(T.head)})</span>${head ? `<b>${esc(head.name)} ${esc(head.rank)}</b>${head.mbti ? ` <small class="muted">${esc(head.mbti)} · ${esc(Mbti.info(head.mbti)?.style || "")}</small>` : ""}` : `<b class="muted">공석</b> <small class="muted">${esc(rule.text)}</small>`}</div>
+          ${u.type === "team" ? `<div class="kv"><span>팀원</span><b>${members.map((m) => esc(m.name)).join(", ") || "없음"}</b></div>` : `<div class="kv"><span>하위 조직</span><b>${org.children(u).map((c) => esc(c.name)).join(", ") || "없음"}</b></div>`}
+          <div class="field"><label for="rm-role">이 방이 하는 업무 (책임자가 이 범위로 업무를 나누고, 팀원 질문에 답합니다)</label>
+            <textarea id="rm-role" maxlength="4000" rows="5" placeholder="예) 로컬 플랫폼 기획·운영. 결과물: 기획서·운영 지표. 범위 밖 요청은 비서실에 확인.">${esc(u.role_text || "")}</textarea></div>
+          <div class="kv"><span>사용 AI</span><select id="rm-engine"><option value="openai" ${u.engine === "openai" ? "selected" : ""}>ChatGPT</option><option value="gemini" ${u.engine === "gemini" ? "selected" : ""}>Gemini</option></select></div>
+          <p class="hint">하루 AI 몫 · 책임자 ${lim(0.05)} 토큰(5%, 규제 없음) · 팀원 각 ${lim(0.10)} 토큰(10%, 한도 적용)</p>
+        </div>` : `<p class="hint">조직을 연결하면 이 방의 업무와 책임자가 정해집니다. 아직 조직이 없다면 아래 버튼으로 바로 만드세요.</p>`}
+      <div class="room-msg" hidden></div>`;
+    this.foot.innerHTML = `${u ? "" : `<button type="button" class="btn" data-newteam>이 방으로 새 팀 만들기</button>`}<button type="button" class="btn primary" data-save>저장</button>`;
+    this.foot.querySelector("[data-save]").onclick = () => this.save();
+    this.foot.querySelector("[data-newteam]")?.addEventListener("click", () => this.newTeam());
+  }
+  click() {}
+  async newTeam() {
+    try {
+      const r = await this.store.api.saveUnit({ type: "team", name: this.body.querySelector("#rm-name").value || this.room.name });
+      this.unitId = r?.id || null; await this.store.refresh(false); this.render();
+      this.store.emit("toast", "새 팀을 만들었습니다. 이 방의 업무를 적고 저장하세요.");
+    } catch (e) { show(this.body.querySelector(".room-msg"), e.friendly || e.message, "err"); }
+  }
+  async save() {
+    const btn = this.foot.querySelector("[data-save]"); btn.disabled = true;
+    // read the form first: saving the layout refreshes the store, which re-renders this dialog
+    const name = (this.body.querySelector("#rm-name").value || "").trim().slice(0, 30);
+    const roleText = this.body.querySelector("#rm-role")?.value, engine = this.body.querySelector("#rm-engine")?.value;
+    try {
+      const layout = this.store.layout(this.floor);
+      // one room per unit: unlink it from any other room on any floor
+      for (const f of Building.floors) {
+        const L = this.store.layout(f); let dirty = false;
+        for (const r of L.rooms) if (r !== this.room && this.unitId && r.unit_id === this.unitId) { r.unit_id = null; dirty = true; }
+        if (dirty && f !== this.floor) await this.store.saveLayout(L);
+      }
+      this.room.name = name || this.room.name;
+      this.room.unit_id = this.unitId;
+      await this.store.saveLayout(layout);
+      if (this.unitId) await this.store.api.saveUnit({ id: this.unitId, role_text: roleText ?? "", engine: engine || "openai" });
+      await this.store.refresh(false);
+      this.store.emit("toast", this.unitId ? "방의 업무를 저장했습니다. 책임자가 이 범위로 업무를 지시합니다." : "방 설정을 저장했습니다.");
+      this.close();
+    } catch (e) { show(this.body.querySelector(".room-msg"), e.friendly || e.message, "err"); btn.disabled = false; }
   }
 }
 

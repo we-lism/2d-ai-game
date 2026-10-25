@@ -45,8 +45,8 @@ export const ITEM_SPECS = {
 };
 
 export class Room {
-  constructor({ id = uid("r"), name = "새 공간", kind = "office", x, y, w, h, doors = [] }) {
-    Object.assign(this, { id, name, kind, x, y, w, h });
+  constructor({ id = uid("r"), name = "새 공간", kind = "office", x, y, w, h, doors = [], unit_id = null }) {
+    Object.assign(this, { id, name, kind, x, y, w, h, unit_id: unit_id ? Number(unit_id) : null });
     this.doors = doors.map((d) => ({ side: d.side, off: d.off }));
   }
   get x1() { return this.x + this.w; }
@@ -71,7 +71,7 @@ export class Room {
     if (!c) return null;
     return { side: c.side, off: Math.max(26, Math.min(c.len - 26, Math.round(c.off / 5) * 5)) };
   }
-  toJSON() { return { id: this.id, name: this.name, kind: this.kind, x: this.x, y: this.y, w: this.w, h: this.h, doors: this.doors }; }
+  toJSON() { return { id: this.id, name: this.name, kind: this.kind, x: this.x, y: this.y, w: this.w, h: this.h, doors: this.doors, ...(this.unit_id ? { unit_id: this.unit_id } : {}) }; }
 }
 
 export class Item {

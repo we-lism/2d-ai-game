@@ -47,7 +47,7 @@ export class OrderPanel {
     if (!u) { box.textContent = "조직 탭에서 팀을 만들고 직원을 넣으세요. 1명뿐인 팀은 그 직원이 직접 맡고, 2명 이상이면 팀장을 임명해야 합니다."; return; }
     const sec = org.secretary;
     const ex = u.type === "dept" ? org.executives.find((p) => (p.oversees || []).map(Number).includes(u.id)) : null;
-    box.textContent = `전달 경로: 사장 → 비서실장(${sec ? sec.name : "공석·AI 대행"}) →${ex ? `\n담당 임원 ${ex.name} ${ex.rank} →` : ""}\n${this.chain(u)}\n기본 업무: ${u.role_text?.trim() || "미지정 (조직 탭에서 입력)"}`;
+    box.textContent = `전달 경로: 사장 → 비서실장(${sec ? sec.name : "공석·AI 대행"}) →${ex ? `\n담당 임원 ${ex.name} ${ex.rank} →` : ""}\n${this.chain(u)}\n기본 업무: ${u.role_text?.trim() || "미지정 (방 이름표나 조직 탭에서 입력)"}`;
   }
   async submit() {
     const msg = this.root.querySelector("#od-msg"), btn = this.root.querySelector("#od-btn");
@@ -84,6 +84,7 @@ export class ProgressPanel {
       ${work.map((a) => { const p = org.person(a.character_id); return `<div class="asg ${a.status}">
         <button type="button" class="linkish" data-person="${a.character_id ?? ""}">${esc(p ? `${p.name} ${p.rank}` : "(퇴사자)")}</button>
         <span class="sub">업무: ${esc(a.task)}</span>
+        ${a.qa ? `<details class="sum qa"><summary>${/\n답변[:：]/.test(a.qa) ? "질문 · 책임자 답변" : "책임자에게 질문 중…"}</summary><pre>${esc(a.qa)}</pre></details>` : ""}
         ${a.result ? `<pre>${esc(a.result)}</pre>` : `<span class="sub">작업 중…</span>`}
         ${a.result && a.status === "done" ? scoreButtons("work", a.id, a.score) : ""}
       </div>`; }).join("")}

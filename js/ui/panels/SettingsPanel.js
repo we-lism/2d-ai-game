@@ -21,9 +21,10 @@ export class SettingsPanel {
         <div id="cal-msg" hidden></div>
       </section>
       <section class="stack">
-        <h3>성실함 (하루 AI 사용 한도)</h3>
-        <p class="hint">성실함 = 오늘 쓴 AI 토큰 ÷ 하루 한도. 직원별 한도는 직원을 눌러 바꿉니다.</p>
-        <div class="key-row"><div class="field"><label for="def-limit">기본 하루 한도 (토큰)</label><input id="def-limit" type="number" min="1000" step="1000"></div><button class="btn small" type="button" id="btn-limit">저장</button></div>
+        <h3>회사 하루 AI 사용량</h3>
+        <p class="hint">직원별 하루 몫 = 회사 하루 사용량 × 비율. 성실함 = 오늘 쓴 토큰 ÷ 내 몫.</p>
+        <ul class="share-list"><li>비서실 3% · 지시 하달·보고 취합 (규제 없음)</li><li>조직 책임자·임원 5% · 결과물 보고·관리, 팀원 질문 답변 (규제 없음)</li><li>팀원 각 10% · 실무 수행 (몫을 다 쓰면 그날 작업 중지)</li></ul>
+        <div class="key-row"><div class="field"><label for="def-limit">회사 하루 사용량 (토큰)</label><input id="def-limit" type="number" min="1000" step="1000"></div><button class="btn small" type="button" id="btn-limit">저장</button></div>
         <div id="lim-msg" hidden></div>
       </section>
       <section class="stack">
@@ -58,8 +59,8 @@ export class SettingsPanel {
     root.querySelector("#btn-cal-off").onclick = async () => { try { await store.api.setGoogleToken(""); await store.refresh(true); show(root.querySelector("#cal-msg"), "연결을 해제했습니다.", "ok"); } catch (e) { show(root.querySelector("#cal-msg"), e.friendly || e.message, "err"); } };
     root.querySelector("#btn-limit").onclick = async () => {
       const v = Math.round(+root.querySelector("#def-limit").value); const m = root.querySelector("#lim-msg");
-      if (!(v >= 1000)) return show(m, "1,000 이상으로 입력하세요.", "err");
-      try { await store.api.setLimit(null, v); await store.refresh(true); show(m, "기본 한도를 저장했습니다.", "ok"); } catch (e) { show(m, e.friendly || e.message, "err"); }
+      if (!(v >= 10000)) return show(m, "10,000 이상으로 입력하세요.", "err");
+      try { await store.api.setLimit(null, v); await store.refresh(true); show(m, "회사 하루 사용량을 저장했습니다.", "ok"); } catch (e) { show(m, e.friendly || e.message, "err"); }
     };
   }
   render() {
@@ -72,7 +73,7 @@ export class SettingsPanel {
     this.root.querySelector("#btn-cal-test").disabled = !p.has_google;
     this.root.querySelector("#btn-cal-off").disabled = !p.has_google;
     if (!this.root.contains(document.activeElement)) {
-      this.root.querySelector("#def-limit").value = p.default_limit || 50000;
+      this.root.querySelector("#def-limit").value = p.default_limit || 500000;
       this.root.querySelector("#pf-name").value = p.name || ""; this.root.querySelector("#pf-phone").value = p.phone || ""; this.root.querySelector("#pf-engine").value = p.report_engine || "openai";
     }
   }
