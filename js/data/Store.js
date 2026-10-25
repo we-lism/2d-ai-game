@@ -55,6 +55,17 @@ export class GameStore extends Emitter {
     }
     return null;
   }
+  /** Everything one person handled: work they did and units they led, newest first. */
+  historyOf(p) {
+    const out = [];
+    for (const ins of this.instructions) {
+      for (const a of ins.assignments || []) if (a.character_id === p.id) out.push({ kind: "work", ins, a, at: a.updated_at || ins.created_at, status: a.status });
+      for (const u of ins.units || []) if (u.head_id === p.id) out.push({ kind: "lead", ins, u, at: u.updated_at || ins.created_at, status: u.status });
+    }
+    return out.sort((x, y) => String(y.at).localeCompare(String(x.at)));
+  }
+  /** What this person is doing for an open order right now. */
+  currentOf(p) { return this.historyOf(p).filter((h) => ["assigning", "working", "reporting", "queued"].includes(h.ins.status) && !["done", "error"].includes(h.status)); }
   /** Plain team members rest on 2F until their leader calls them. */
   isTeamMember(p) {
     if (!p || p.role !== "staff" || (p.oversees || []).length) return false;

@@ -92,7 +92,8 @@ export class TaskDirector {
       if (boss) this.say(boss, `호출: ${head.name} ${head.rank}`);
       this.log(`${parent?.unit_name ?? ""} → ${ur.unit_name} 업무 전달`);
     }
-    this.script(head, [this.sim.goHome(this.actor(head)), Act.wait(4000, "업무 틀 작성", () => this.urStatus(ins.id, ur.id) !== "planning", 200000)]);
+    const label = ur.unit_id == null ? "부서에 업무 지시" : "업무 틀 작성";
+    this.script(head, [this.sim.goHome(this.actor(head)), Act.wait(4000, label, () => this.urStatus(ins.id, ur.id) !== "planning", 200000)]);
   }
 
   onUnitWorking(ins, ur) {
@@ -126,7 +127,7 @@ export class TaskDirector {
     const back = this.store.isTeamMember(p) ? this.sim.restGo(this.actor(p)) : this.sim.goHome(this.actor(p));
     if (head && head.id !== p.id) {
       const n = this.near(head, 28);
-      this.script(p, [Act.go(n.floor, n.point, { exact: true }), Act.wait(2500, a.status === "error" ? "문제 보고" : "결과 보고"),
+      this.script(p, [Act.say(`${head.name} ${head.rank}께 완료보고`, 2000), Act.go(n.floor, n.point, { exact: true }), Act.wait(2500, a.status === "error" ? "문제 보고" : "완료보고 드립니다"),
         Act.call(() => this.say(head, "보고 받음", 2000)), Act.say(this.store.isTeamMember(p) ? "2층에서 대기합니다" : "자리로", 2500), back]);
     } else this.script(p, [Act.wait(2000, "작업 완료")]);
   }
@@ -134,9 +135,10 @@ export class TaskDirector {
   onUnitDone(ins, ur) {
     const head = this.person(ur.head_id); const to = this.receiver(ur);
     if (!head || !to) return;
-    this.log(`${ur.unit_name} ${head.name} → ${to.role === "secretary" ? "비서실" : to.role === "ceo" ? "사장실" : to.name} 보고`);
+    const where = to.role === "secretary" ? "비서실" : to.role === "ceo" ? "사장실" : `${to.name} ${to.rank}`;
+    this.log(`${ur.unit_name} ${head.name} ${head.rank} → ${where} 대면 완료보고`);
     const n = this.near(to);
-    this.script(head, [Act.go(n.floor, n.point, { exact: true }), Act.wait(3500, "보고 전달"),
+    this.script(head, [Act.say(`${where}에 완료보고 하러 갑니다`, 2500), Act.go(n.floor, n.point, { exact: true }), Act.wait(3500, "완료보고 드립니다"),
       Act.call(() => this.say(to, to.role === "secretary" ? "보고 정리 중" : "보고 받음", 3000)), this.sim.goHome(this.actor(head))]);
   }
 
@@ -147,7 +149,7 @@ export class TaskDirector {
     this.store.emit("toast", `보고 도착: ${ins.content.slice(0, 30)}${note}`);
     if (sec && boss) {
       const n = this.near(boss, 40);
-      this.script(sec, [Act.go(n.floor, n.point, { exact: true }), Act.wait(4000, "보고 드립니다"), Act.call(() => this.say(boss, "보고 확인", 3000)), this.sim.goHome(this.actor(sec))]);
+      this.script(sec, [Act.wait(2500, "보고 요약 · 캘린더 등록"), Act.go(n.floor, n.point, { exact: true }), Act.wait(4000, "보고 드립니다"), Act.call(() => this.say(boss, "보고 확인", 3000)), this.sim.goHome(this.actor(sec))]);
     } else if (boss) this.say(boss, "보고 확인", 3000);
   }
 }

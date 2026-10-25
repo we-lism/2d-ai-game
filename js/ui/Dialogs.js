@@ -106,58 +106,84 @@ export class DeskDialog extends Modal {
   }
 }
 
-/** Person click: current work, reports, adopt/hold, and performance. */
+const UR_LABEL = { planning: "업무 틀 작성 중", working: "하위 보고 대기", summarizing: "보고서 작성 중", done: "완료보고 함", error: "오류" };
+const W_LABEL = { working: "수행 중", done: "완료보고 함", error: "오류" };
+
+/** Person click: 진행 중인 업무 상태 · 업무 이력 · 성실함, plus adopt/hold and performance. */
 export class EmployeeDialog extends Modal {
   constructor(store, personId, sim) {
     super("직원 정보", { wide: true });
     Object.assign(this, { store, personId, sim });
+    this.tab = "now";
     this.off = store.on("change", () => this.render());
     this.onClose = () => this.off();
     this.body.addEventListener("click", (e) => this.click(e));
     this.render();
   }
+  where() {
+    const a = this.sim?.actors.get(this.personId);
+    if (!a || a.state === "off") return "건물 밖";
+    if (a.state === "transit") return `${a.tr?.via === "elev" ? "엘리베이터" : "계단"}로 이동 중`;
+    const room = this.store.layout(a.floor).roomAt(a.x, a.y);
+    return `${Building.label(a.floor)} ${room?.name || "복도"}${a.bubble ? " · " + a.bubble.text : a.state === "walk" ? " · 이동 중" : ""}`;
+  }
+  row(h) {
+    const ins = h.ins;
+    if (h.kind === "work") {
+      const a = h.a;
+      return `<article class="rep">
+        <header><span class="pill ${a.status === "done" ? "done" : a.status === "error" ? "error" : "working"}">${W_LABEL[a.status]}</span><small>${fmtTime(h.at)}</small></header>
+        <div class="rep-task"><b>맡은 일</b> ${esc(a.task)}</div><div class="sub">대표 지시: ${esc(ins.content)}</div>
+        ${a.result ? `<details class="sum"><summary>결과 보기</summary><pre>${esc(a.result)}</pre></details>` : ""}
+        ${a.result && a.status === "done" ? `<div class="verdict" role="group" aria-label="평가">
+          <button type="button" class="btn small ${a.verdict === "adopted" ? "primary" : ""}" data-v="adopted" data-a="${a.id}">채택</button>
+          <button type="button" class="btn small ${a.verdict === "held" ? "danger" : ""}" data-v="held" data-a="${a.id}">보류</button>
+          ${a.verdict ? `<button type="button" class="btn small" data-v="" data-a="${a.id}">평가 취소</button>` : ""}</div>` : ""}
+      </article>`;
+    }
+    const u = h.u;
+    return `<article class="rep">
+      <header><span class="pill ${u.status === "done" ? "done" : u.status === "error" ? "error" : "working"}">${UR_LABEL[u.status]}</span><small>${esc(u.unit_name)} 책임 · ${fmtTime(h.at)}</small></header>
+      <div class="rep-task"><b>받은 일</b> ${esc(u.task)}</div>
+      ${u.plan_note ? `<div class="sub">업무 틀: ${esc(u.plan_note)}</div>` : ""}
+      ${u.summary ? `<details class="sum"><summary>올린 보고서 보기</summary><pre>${esc(u.summary)}</pre></details>` : ""}
+    </article>`;
+  }
   render() {
     const p = this.store.person(this.personId); if (!p) { this.close(); return; }
-    const org = this.store.org; const perf = this.store.performance(p); const work = this.store.workOf(p);
-    const now = work.find((w) => ["working"].includes(w.a.status) && ["assigning", "working", "reporting"].includes(w.ins.status));
-    const led = org.ledBy(p).map((u) => u.name);
-    const desk = this.store.deskOf(p);
-    const a = this.sim?.actors.get(p.id);
+    const org = this.store.org; const perf = this.store.performance(p);
+    const history = this.store.historyOf(p); const now = this.store.currentOf(p);
+    const u = this.store.usage(p); const desk = this.store.deskOf(p);
+    const boss = (() => { const t = org.unit(p.unit_id); if (!t) return null; if (t.head_id && t.head_id !== p.id) return org.person(t.head_id); const parent = t.parent_id ? org.unit(t.parent_id) : null; return parent ? org.head(parent) : null; })();
     this.title = `${p.name} · ${org.title(p)}`;
+    const barCls = u.rate >= 100 ? "full" : u.rate >= 80 ? "warn" : "";
     this.body.innerHTML = `<div class="emp-head">
         <canvas width="120" height="150" class="portrait small" aria-label="${esc(p.name)} 얼굴"></canvas>
         <div class="emp-facts">
+          <div class="kv"><span>지금 위치</span><b>${esc(this.where())}</b></div>
           <div class="kv"><span>MBTI</span><b>${esc(p.mbti || "-")}</b></div>
-          ${p.role === "ceo" ? "" : (() => { const u = this.store.usage(p); return `<div class="kv"><span>성실함</span><b class="mono">${u.rate}%</b><small class="muted">${u.used.toLocaleString()} / ${u.limit.toLocaleString()} 토큰</small></div>
-          <div class="kv"><span>하루 한도</span><input id="emp-limit" type="number" min="1000" step="1000" value="${p.daily_limit || ""}" placeholder="${this.store.defaultLimit.toLocaleString()} (기본)" class="num-in"><button type="button" class="btn small" data-limit>저장</button></div>`; })()}
           <div class="kv"><span>자리</span><b>${desk ? `${Building.label(desk.floor)} ${esc(this.store.layout(desk.floor).roomOf(desk.item)?.name || "")}` : p.role === "ceo" ? "사장실" : "배정 전"}</b></div>
-          <div class="kv"><span>지금</span><b>${esc(a?.bubble?.text || (a?.state === "off" ? "건물 밖" : a?.state === "walk" ? "이동 중" : "근무 중"))}</b></div>
-          ${led.length ? `<div class="kv"><span>이끄는 조직</span><b>${esc(led.join(", "))}</b></div>` : ""}
-          ${(p.oversees || []).length ? `<div class="kv"><span>담당 부</span><b>${esc(p.oversees.map((id) => org.unit(id)?.name).filter(Boolean).join(", "))}</b></div>` : ""}
+          ${boss ? `<div class="kv"><span>보고 대상</span><b>${esc(boss.name)} ${esc(boss.rank)}</b></div>` : ""}
+          ${(p.oversees || []).length ? `<div class="kv"><span>담당 부</span><b>${esc(p.oversees.map((id) => org.unit(+id)?.name).filter(Boolean).join(", "))}</b> <small class="muted">→ 비서실에 보고</small></div>` : ""}
         </div>
-        <div class="perf">
-          <div class="label">업무 성과 (대표 채택률)</div>
-          <div class="perf-num mono">${perf.rate == null ? "–" : perf.rate + "%"}</div>
-          <div class="bar"><b style="width:${perf.rate ?? 0}%"></b></div>
-          <small>채택 ${perf.adopted} · 보류 ${perf.held} · 미평가 ${perf.total - perf.judged} / 전체 ${perf.total}건</small>
-        </div>
+        ${p.role === "ceo" ? "" : `<div class="perf">
+          <div class="label">성실함 (오늘 AI 사용률)</div>
+          <div class="perf-num mono">${u.rate}%</div>
+          <div class="bar ${barCls}"><b style="width:${Math.min(100, u.rate)}%"></b></div>
+          <small>${u.used.toLocaleString()} / ${u.limit.toLocaleString()} 토큰${u.rate >= 100 ? " · 오늘 한도 소진" : ""}</small>
+          <div class="kv"><input id="emp-limit" type="number" min="1000" step="1000" value="${p.daily_limit || ""}" placeholder="한도 ${this.store.defaultLimit.toLocaleString()}" class="num-in" aria-label="하루 한도"><button type="button" class="btn small" data-limit>한도 저장</button></div>
+          <small>업무 성과(채택률) ${perf.rate == null ? "–" : perf.rate + "%"} · 채택 ${perf.adopted} · 보류 ${perf.held}</small>
+        </div>`}
       </div>
-      <h4>현재 맡은 업무</h4>
-      ${now ? `<div class="task-now"><span class="pill working">수행 중</span> ${esc(now.a.task)}<small>지시: ${esc(now.ins.content)}</small></div>` : `<p class="empty-note">지금 맡은 업무가 없습니다.</p>`}
-      <h4>올라온 보고서</h4>
-      ${work.filter((w) => w.a.result).map(({ ins, a: asg }) => `<article class="rep">
-        <header><span class="pill ${ins.status}">${STATUS[ins.status]}</span><small>${fmtTime(asg.updated_at || ins.created_at)}</small></header>
-        <div class="rep-task"><b>업무</b> ${esc(asg.task)}</div>
-        <pre>${esc(asg.result)}</pre>
-        <div class="verdict" role="group" aria-label="평가">
-          <button type="button" class="btn small ${asg.verdict === "adopted" ? "primary" : ""}" data-v="adopted" data-a="${asg.id}">채택</button>
-          <button type="button" class="btn small ${asg.verdict === "held" ? "danger" : ""}" data-v="held" data-a="${asg.id}">보류</button>
-          ${asg.verdict ? `<button type="button" class="btn small" data-v="" data-a="${asg.id}">평가 취소</button>` : ""}
-        </div></article>`).join("") || `<p class="empty-note">아직 올라온 보고서가 없습니다.</p>`}
-      <p class="hint">성실함 = 오늘 쓴 AI 토큰 ÷ 하루 한도. 100%가 되면 그날은 일을 받지 않습니다. 업무 성과 = 채택 ÷ (채택+보류).</p>`;
+      <div class="tabs" role="tablist">
+        <button role="tab" type="button" aria-selected="${this.tab === "now"}" data-tab="now">진행 중 업무 ${now.length}</button>
+        <button role="tab" type="button" aria-selected="${this.tab === "hist"}" data-tab="hist">업무 이력 ${history.length}</button>
+      </div>
+      <div class="stack">${(this.tab === "now" ? now : history).map((h) => this.row(h)).join("") || `<p class="empty-note">${this.tab === "now" ? "지금 진행 중인 업무가 없습니다." + (this.store.isTeamMember(p) ? " 2층에서 쉬며 팀장 호출을 기다립니다." : "") : "아직 업무 이력이 없습니다."}</p>`}</div>`;
     PersonSprite.portrait(this.body.querySelector("canvas"), p.look, { ceo: p.role === "ceo" });
   }
   async click(e) {
+    const t = e.target.closest("[data-tab]"); if (t) { this.tab = t.dataset.tab; this.render(); return; }
     if (e.target.closest("[data-limit]")) {
       const v = +this.body.querySelector("#emp-limit").value;
       try { await this.store.api.setLimit(this.personId, v ? Math.max(1000, Math.round(v)) : null); await this.store.refresh(false); this.store.emit("toast", "하루 한도를 저장했습니다."); }
