@@ -1,4 +1,4 @@
-import { Look } from "../model/Look.js?v=202610251159";
+import { Look } from "../model/Look.js?v=202610251204";
 
 export function shade(col, f) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(col).trim()); if (!m) return col;

@@ -1,5 +1,5 @@
-import { esc, show, fmtTime } from "../../util/dom.js?v=202610251159";
-import { scoreButtons, handleScoreClick } from "../Score.js?v=202610251159";
+import { esc, show, fmtTime } from "../../util/dom.js?v=202610251204";
+import { scoreButtons, handleScoreClick } from "../Score.js?v=202610251204";
 
 const STATUS = { queued: "비서실 전달 중", assigning: "업무 틀 작성", working: "수행 중", reporting: "보고 취합 중", done: "보고 완료", error: "오류" };
 const ENGINE = { openai: "ChatGPT", gemini: "Gemini" };
@@ -9,10 +9,13 @@ const UNIT_HEAD = { dept: "부서장", section: "과 책임자", team: "팀장" 
 
 /** 지시: 대표가 담당 조직(부·과·팀)을 고르면 비서실이 그 조직장에게 전달합니다. */
 export class OrderPanel {
-  constructor(root, store, { onIssued }) {
-    Object.assign(this, { root, store, onIssued });
+  constructor(root, store, { onIssued, onPerson, onTab }) {
+    Object.assign(this, { root, store, onIssued, onPerson, onTab });
     root.innerHTML = `
-      <div class="flow"><span>사장</span><span>비서실</span><span>조직장</span><span>팀장·팀원</span></div>
+      <div class="flow" role="group" aria-label="지시 전달 단계 · 누르면 담당자 정보">
+        <button type="button" data-step="ceo">사장</button><button type="button" data-step="sec">비서실</button><button type="button" data-step="head">조직장</button><button type="button" data-step="team">팀장·팀원</button>
+      </div>
+      <div class="flow-note" id="od-flow"></div>
       <form id="f-order" class="stack">
         <div class="field"><label for="od-team">담당 조직</label><select id="od-team"></select></div>
         <div class="role-preview" id="od-role"></div>
@@ -23,6 +26,7 @@ export class OrderPanel {
       <p class="hint">완료될 때마다 비서실이 정리·요약해 보고합니다. 구글 캘린더를 연결하면 알림으로도 받습니다(설정 탭).</p>`;
     this.sel = root.querySelector("#od-team");
     this.sel.addEventListener("change", () => this.preview());
+    root.querySelector(".flow").addEventListener("click", (e) => this.step(e.target.closest("[data-step]")?.dataset.step));
     root.querySelector("#f-order").addEventListener("submit", (e) => { e.preventDefault(); this.submit(); });
   }
   render() {
@@ -30,9 +34,33 @@ export class OrderPanel {
     const units = org.orderable.sort((a, b) => ["dept", "section", "team"].indexOf(a.type) - ["dept", "section", "team"].indexOf(b.type));
     this.sel.innerHTML = units.length ? units.map((u) => `<option value="${u.id}">[${TYPE[u.type]}] ${esc(org.path(u))} · ${u.head_id ? esc(org.head(u)?.name || "") + " " + esc(UNIT_HEAD[u.type]) : "1인 팀"}</option>`).join("") : `<option value="">지시를 받을 조직이 없습니다</option>`;
     if (keep && units.some((u) => String(u.id) === keep)) this.sel.value = keep;
+    this.flow();
     this.root.querySelector("#od-btn").disabled = false;   // always clickable; if nobody can take it, say why
     const m = this.root.querySelector("#od-msg"); if (units.length && m.textContent.startsWith("지시를 받을 조직이")) m.hidden = true;
     this.preview();
+  }
+  /** Lights up where the latest order is right now: 사장 → 비서실 → 조직장 → 팀장·팀원 → (보고) → 사장. */
+  flow() {
+    const ins = this.store.instructions[0];
+    const at = !ins ? null : { queued: "sec", assigning: "head", working: "team", reporting: "head", done: "ceo", error: null }[ins.status];
+    const steps = ["ceo", "sec", "head", "team"];
+    this.root.querySelectorAll(".flow [data-step]").forEach((b) => {
+      b.classList.toggle("on", b.dataset.step === at);
+      b.classList.toggle("past", !!ins && ins.status !== "done" && ins.status !== "error" && at && steps.indexOf(b.dataset.step) < steps.indexOf(at));
+    });
+    const note = this.root.querySelector("#od-flow");
+    if (!ins) note.textContent = "단계를 누르면 그 담당자를 볼 수 있습니다. 지시를 내리면 진행 단계에 불이 들어옵니다.";
+    else note.textContent = `최근 지시 "${ins.content.slice(0, 18)}${ins.content.length > 18 ? "…" : ""}" · ${STATUS[ins.status] || ins.status}${ins.status === "reporting" ? " (조직장이 비서실로 보고)" : ""}`;
+  }
+  /** Step click: open the person in charge of that step. */
+  step(k) {
+    if (!k) return;
+    const org = this.store.org; const u = org.unit(+this.sel.value);
+    if (k === "ceo") return org.ceo && this.onPerson?.(org.ceo.id);
+    if (k === "sec") return org.secretary ? this.onPerson?.(org.secretary.id) : this.store.emit("toast", "비서실장이 공석입니다. 조직 탭에서 임명하세요.");
+    const head = u ? org.head(u) || org.people.find((x) => x.unit_id === u.id && x.role === "staff") : null;
+    if (k === "head") return head ? this.onPerson?.(head.id) : this.store.emit("toast", "담당 조직을 먼저 고르세요.");
+    if (k === "team") return this.onTab?.("org");
   }
   /** Shows the chain this order will travel. */
   chain(u, depth = 0) {

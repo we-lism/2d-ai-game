@@ -1,6 +1,6 @@
-import { esc, show } from "../../util/dom.js?v=202610251159";
-import { UNIT_TYPES } from "../../model/Organization.js?v=202610251159";
-import { Building } from "../../model/Layout.js?v=202610251159";
+import { esc, show } from "../../util/dom.js?v=202610251204";
+import { UNIT_TYPES } from "../../model/Organization.js?v=202610251204";
+import { Building } from "../../model/Layout.js?v=202610251204";
 
 /**
  * 조직: build 부 › 과 › 팀, put people in teams, appoint heads when the rule allows,

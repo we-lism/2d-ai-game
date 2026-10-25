@@ -1,11 +1,11 @@
-import { Modal } from "./Modal.js?v=202610251159";
-import { esc, show, fmtTime } from "../util/dom.js?v=202610251159";
-import { PersonSprite } from "../render/PersonSprite.js?v=202610251159";
-import { CandidateFactory, HAIR_STYLES, EYE_STYLES } from "../model/Look.js?v=202610251159";
-import { Building } from "../model/Layout.js?v=202610251159";
-import { nextRank, UNIT_TYPES } from "../model/Organization.js?v=202610251159";
-import { Mbti } from "../model/Mbti.js?v=202610251159";
-import { scoreButtons, handleScoreClick } from "./Score.js?v=202610251159";
+import { Modal } from "./Modal.js?v=202610251204";
+import { esc, show, fmtTime } from "../util/dom.js?v=202610251204";
+import { PersonSprite } from "../render/PersonSprite.js?v=202610251204";
+import { CandidateFactory, HAIR_STYLES, EYE_STYLES } from "../model/Look.js?v=202610251204";
+import { Building } from "../model/Layout.js?v=202610251204";
+import { nextRank, UNIT_TYPES } from "../model/Organization.js?v=202610251204";
+import { Mbti } from "../model/Mbti.js?v=202610251204";
+import { scoreButtons, handleScoreClick } from "./Score.js?v=202610251204";
 
 const STATUS = { queued: "비서 전달 중", assigning: "업무 분배 회의", working: "수행 중", reporting: "팀장 취합 중", done: "보고 완료", error: "오류" };
 const skinName = (hex) => ["아주 밝은", "밝은", "중간", "구릿빛", "갈색", "짙은"][["#f6d7bd", "#eec39f", "#dcaa80", "#c48a5e", "#9a6640", "#6e4528"].indexOf(hex)] || "";

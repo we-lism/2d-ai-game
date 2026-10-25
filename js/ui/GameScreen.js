@@ -1,15 +1,15 @@
-import { $, $$, esc } from "../util/dom.js?v=202610251159";
-import { Building } from "../model/Layout.js?v=202610251159";
-import { Simulation } from "../sim/Simulation.js?v=202610251159";
-import { TaskDirector } from "../sim/TaskDirector.js?v=202610251159";
-import { FloorRenderer } from "../render/FloorRenderer.js?v=202610251159";
-import { Iso, Camera } from "../render/Iso.js?v=202610251159";
-import { LayoutEditor } from "./LayoutEditor.js?v=202610251159";
-import { HireDialog, FireDialog, DeskDialog, EmployeeDialog, ElevatorDialog, RoomDialog } from "./Dialogs.js?v=202610251159";
-import { Act } from "../sim/Actor.js?v=202610251159";
-import { OrderPanel, ProgressPanel, ReportsPanel } from "./panels/WorkPanels.js?v=202610251159";
-import { OrgPanel } from "./panels/OrgPanel.js?v=202610251159";
-import { SettingsPanel } from "./panels/SettingsPanel.js?v=202610251159";
+import { $, $$, esc } from "../util/dom.js?v=202610251204";
+import { Building } from "../model/Layout.js?v=202610251204";
+import { Simulation } from "../sim/Simulation.js?v=202610251204";
+import { TaskDirector } from "../sim/TaskDirector.js?v=202610251204";
+import { FloorRenderer } from "../render/FloorRenderer.js?v=202610251204";
+import { Iso, Camera } from "../render/Iso.js?v=202610251204";
+import { LayoutEditor } from "./LayoutEditor.js?v=202610251204";
+import { HireDialog, FireDialog, DeskDialog, EmployeeDialog, ElevatorDialog, RoomDialog } from "./Dialogs.js?v=202610251204";
+import { Act } from "../sim/Actor.js?v=202610251204";
+import { OrderPanel, ProgressPanel, ReportsPanel } from "./panels/WorkPanels.js?v=202610251204";
+import { OrgPanel } from "./panels/OrgPanel.js?v=202610251204";
+import { SettingsPanel } from "./panels/SettingsPanel.js?v=202610251204";
 
 const FLOOR_SUMMARY = (layout) => layout.rooms.length ? layout.rooms.map((r) => r.name).join(" · ") : "비어 있음";
 
@@ -59,7 +59,7 @@ export class GameScreen {
     });
     const openPerson = (id) => new EmployeeDialog(store, id, this.sim).open();
     this.panels = {
-      order: new OrderPanel($('[data-pane="order"]', root), store, { onIssued: (ins) => this.onIssued(ins) }),
+      order: new OrderPanel($('[data-pane="order"]', root), store, { onIssued: (ins) => this.onIssued(ins), onPerson: (id) => openPerson(id), onTab: (t) => $(`#sideTabs [data-tab="${t}"]`, root)?.click() }),
       progress: new ProgressPanel($('[data-pane="progress"]', root), store, { onPerson: openPerson }),
       reports: new ReportsPanel($('[data-pane="reports"]', root), store),
       org: new OrgPanel($('[data-pane="org"]', root), store, { onPerson: openPerson }),
@@ -233,6 +233,7 @@ export class GameScreen {
       if (pane.contains(document.activeElement) && /input|textarea|select/i.test(document.activeElement.tagName)) continue;
       p.render();
     }
+    this.panels.order.flow();   // keep the stage lights current even while the CEO is typing
     $("#floorRooms", this.root).textContent = FLOOR_SUMMARY(this.store.layout(this.floor));
   }
   onIssued(ins) {

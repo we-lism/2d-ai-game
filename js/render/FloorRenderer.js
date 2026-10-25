@@ -1,6 +1,6 @@
-import { Iso, Camera } from "./Iso.js?v=202610251159";
-import { PersonSprite, shade } from "./PersonSprite.js?v=202610251159";
-import { Building, ROOM_KINDS } from "../model/Layout.js?v=202610251159";
+import { Iso, Camera } from "./Iso.js?v=202610251204";
+import { PersonSprite, shade } from "./PersonSprite.js?v=202610251204";
+import { Building, ROOM_KINDS } from "../model/Layout.js?v=202610251204";
 
 const TALL = 32, LOW = 9, OUTER = 72;
 const FF = '"IBM Plex Sans KR", system-ui, sans-serif';

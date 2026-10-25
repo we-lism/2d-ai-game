@@ -1,7 +1,7 @@
-import { Emitter } from "../core/Emitter.js?v=202610251159";
-import { FloorLayout, Building } from "../model/Layout.js?v=202610251159";
-import { Organization } from "../model/Organization.js?v=202610251159";
-import { Look } from "../model/Look.js?v=202610251159";
+import { Emitter } from "../core/Emitter.js?v=202610251204";
+import { FloorLayout, Building } from "../model/Layout.js?v=202610251204";
+import { Organization } from "../model/Organization.js?v=202610251204";
+import { Look } from "../model/Look.js?v=202610251204";
 
 /**
  * Client-side copy of one company's state. Every screen reads from here;
