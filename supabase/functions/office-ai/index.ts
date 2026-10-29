@@ -1,6 +1,7 @@
 import postgres from "npm:postgres@3.4.4";
 
 /*
+ * AI engines: ChatGPT (OpenAI Responses + Conversations), Gemini, Claude (Anthropic Messages). Preferred engine first, others as fallback.
  * Report chain, run one step per invocation (each step kicks the next through pg_net):
  *   instruction → plan(top unit) → [plan(child units)…] → work(assignments) → summarize(team)
  *   → summarize(parent units…) → [executive] → secretary → Google Calendar notification to the CEO.
@@ -8,8 +9,10 @@ import postgres from "npm:postgres@3.4.4";
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { max: 4, prepare: false });
 const OPENAI_MODEL = () => Deno.env.get("OPENAI_MODEL") || "gpt-6-luna";
 const GEMINI_MODEL = () => Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash";
-type Engine = "openai" | "gemini";
-type Keys = { openai?: string | null; gemini?: string | null };
+const CLAUDE_MODEL = () => Deno.env.get("CLAUDE_MODEL") || "claude-sonnet-5-5";
+type Engine = "openai" | "gemini" | "claude";
+type Keys = { openai?: string | null; gemini?: string | null; claude?: string | null };
+const ENGINES: Engine[] = ["openai", "gemini", "claude"];
 type Person = { id: number; name: string; rank: string; mbti: string; daily_limit: number | null; conversation_id: string | null; role: string; oversees: number[] };
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 500);
 const COLS = "id, name, rank, mbti, daily_limit, conversation_id, role, oversees";
@@ -21,10 +24,10 @@ async function vaultGet(id: string | null) {
   return id ? (await sql`select decrypted_secret from vault.decrypted_secrets where id=${id}`)[0]?.decrypted_secret ?? null : null;
 }
 async function keysFor(owner: string): Promise<Keys> {
-  const [p] = await sql`select openai_key_id, gemini_key_id from game.profiles where user_id=${owner}`;
-  const k: Keys = { openai: await vaultGet(p?.openai_key_id ?? null), gemini: await vaultGet(p?.gemini_key_id ?? null) };
+  const [p] = await sql`select openai_key_id, gemini_key_id, claude_key_id from game.profiles where user_id=${owner}`;
+  const k: Keys = { openai: await vaultGet(p?.openai_key_id ?? null), gemini: await vaultGet(p?.gemini_key_id ?? null), claude: await vaultGet(p?.claude_key_id ?? null) };
   const [adm] = await sql`select value from game.config where key='admin_uid'`;
-  if (adm?.value === owner) { k.openai ||= Deno.env.get("OPENAI_API_KEY") ?? null; k.gemini ||= Deno.env.get("GEMINI_API_KEY") ?? null; }
+  if (adm?.value === owner) { k.openai ||= Deno.env.get("OPENAI_API_KEY") ?? null; k.gemini ||= Deno.env.get("GEMINI_API_KEY") ?? null; k.claude ||= Deno.env.get("ANTHROPIC_API_KEY") ?? null; }
   return k;
 }
 
@@ -74,6 +77,28 @@ async function callGemini(key: string, who: Person | null, system: string, user:
   return { text: (j.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join(""), tokens: Number(j.usageMetadata?.totalTokenCount ?? 0) };
 }
 
+// Claude: Messages API; like Gemini, the employee's recent exchanges are replayed from our own table.
+async function callClaude(key: string, who: Person | null, system: string, user: string, json: boolean) {
+  const history = who ? await sql`select role, content from (select role, content, id from game.employee_messages where character_id=${who.id} order by id desc limit 12) h order by id` : [];
+  const msgs: { role: string; content: string }[] = [];
+  for (const h of history) {
+    const role = h.role === "model" ? "assistant" : "user";
+    if (!msgs.length && role !== "user") continue;                       // must start with the user
+    if (msgs.length && msgs[msgs.length - 1].role === role) msgs[msgs.length - 1].content += "\n\n" + h.content; // keep turns alternating
+    else msgs.push({ role, content: String(h.content) });
+  }
+  if (msgs.length && msgs[msgs.length - 1].role === "user") msgs.pop();  // the new request below is the user turn
+  msgs.push({ role: "user", content: user });
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({ model: CLAUDE_MODEL(), max_tokens: 8000, system: system + (json ? "\n반드시 JSON 객체 하나만 출력하고 다른 글은 쓰지 않는다." : ""), messages: msgs }),
+  });
+  const t = await r.text();
+  if (!r.ok) throw new Error(`Claude 오류 ${r.status}: ${t.slice(0, 300)}`);
+  const j = JSON.parse(t);
+  return { text: (j.content ?? []).filter((c: any) => c.type === "text").map((c: any) => c.text).join(""), tokens: Number((j.usage?.input_tokens ?? 0) + (j.usage?.output_tokens ?? 0)) };
+}
+
 /**
  * One company's AI access. default_limit = the company's daily AI budget (tokens).
  * Shares: 비서실 3%, 조직 책임자·임원 5%, 팀원 10% (or a per-person override).
@@ -89,7 +114,7 @@ class Brain {
   }
   static async for(owner: string, pref: string) {
     const [p] = await sql`select default_limit from game.profiles where user_id=${owner}`;
-    return new Brain(owner, await keysFor(owner), pref === "gemini" ? "gemini" : "openai", p?.default_limit ?? 500000);
+    return new Brain(owner, await keysFor(owner), (ENGINES as string[]).includes(pref) ? (pref as Engine) : "openai", p?.default_limit ?? 500000);
   }
   async checkLimit(who: Person) {
     const { pct, hard } = await Brain.share(who);
@@ -100,13 +125,15 @@ class Brain {
   }
   async think(who: Person | null, system: string, user: string, json = false) {
     if (who) await this.checkLimit(who);
-    const order: Engine[] = this.pref === "gemini" ? ["gemini", "openai"] : ["openai", "gemini"];
+    const order: Engine[] = [this.pref, ...ENGINES.filter((e) => e !== this.pref)];   // preferred first, others as fallback
     const usable = order.filter((e) => this.keys[e]);
-    if (!usable.length) throw new Error("AI 키가 등록되지 않았습니다. 게임 설정 탭에서 ChatGPT 또는 Gemini 키를 등록해 주세요.");
+    if (!usable.length) throw new Error("AI 키가 등록되지 않았습니다. 게임 설정 탭에서 ChatGPT, Gemini, Claude 중 하나의 키를 등록해 주세요.");
     let last: unknown;
     for (const e of usable) {
       try {
-        const r = e === "openai" ? await callOpenAI(this.keys.openai!, who, system, user, json) : await callGemini(this.keys.gemini!, who, system, user, json);
+        const r = e === "openai" ? await callOpenAI(this.keys.openai!, who, system, user, json)
+          : e === "claude" ? await callClaude(this.keys.claude!, who, system, user, json)
+          : await callGemini(this.keys.gemini!, who, system, user, json);
         const text = r.text.trim();
         if (!text) { last = new Error(`${e} 빈 응답`); continue; }
         if (who) {

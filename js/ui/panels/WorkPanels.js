@@ -1,8 +1,8 @@
-import { esc, show, fmtTime } from "../../util/dom.js?v=202610251204";
-import { scoreButtons, handleScoreClick } from "../Score.js?v=202610251204";
+import { esc, show, fmtTime } from "../../util/dom.js?v=202610291137";
+import { scoreButtons, handleScoreClick } from "../Score.js?v=202610291137";
 
 const STATUS = { queued: "비서실 전달 중", assigning: "업무 틀 작성", working: "수행 중", reporting: "보고 취합 중", done: "보고 완료", error: "오류" };
-const ENGINE = { openai: "ChatGPT", gemini: "Gemini" };
+const ENGINE = { openai: "ChatGPT", gemini: "Gemini", claude: "Claude" };
 
 const TYPE = { dept: "부", section: "과", team: "팀" };
 const UNIT_HEAD = { dept: "부서장", section: "과 책임자", team: "팀장" };

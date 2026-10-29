@@ -1,4 +1,4 @@
-import { uid } from "../util/random.js?v=202610251204";
+import { uid } from "../util/random.js?v=202610291137";
 
 /* ---------- fixed building shell (same on every floor, not editable) ---------- */
 export const Building = Object.freeze({

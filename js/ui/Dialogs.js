@@ -1,11 +1,11 @@
-import { Modal } from "./Modal.js?v=202610251204";
-import { esc, show, fmtTime } from "../util/dom.js?v=202610251204";
-import { PersonSprite } from "../render/PersonSprite.js?v=202610251204";
-import { CandidateFactory, HAIR_STYLES, EYE_STYLES } from "../model/Look.js?v=202610251204";
-import { Building } from "../model/Layout.js?v=202610251204";
-import { nextRank, UNIT_TYPES } from "../model/Organization.js?v=202610251204";
-import { Mbti } from "../model/Mbti.js?v=202610251204";
-import { scoreButtons, handleScoreClick } from "./Score.js?v=202610251204";
+import { Modal } from "./Modal.js?v=202610291137";
+import { esc, show, fmtTime } from "../util/dom.js?v=202610291137";
+import { PersonSprite } from "../render/PersonSprite.js?v=202610291137";
+import { CandidateFactory, HAIR_STYLES, EYE_STYLES } from "../model/Look.js?v=202610291137";
+import { Building } from "../model/Layout.js?v=202610291137";
+import { nextRank, UNIT_TYPES } from "../model/Organization.js?v=202610291137";
+import { Mbti } from "../model/Mbti.js?v=202610291137";
+import { scoreButtons, handleScoreClick } from "./Score.js?v=202610291137";
 
 const STATUS = { queued: "비서 전달 중", assigning: "업무 분배 회의", working: "수행 중", reporting: "팀장 취합 중", done: "보고 완료", error: "오류" };
 const skinName = (hex) => ["아주 밝은", "밝은", "중간", "구릿빛", "갈색", "짙은"][["#f6d7bd", "#eec39f", "#dcaa80", "#c48a5e", "#9a6640", "#6e4528"].indexOf(hex)] || "";
@@ -292,7 +292,7 @@ export class RoomDialog extends Modal {
           ${rule.ok && !head ? `<div class="kv"><span>팀장 임명</span><select id="rm-head"><option value="">선택…</option>${org.eligibleHeads(u).map((x) => `<option value="${x.id}">${esc(x.name)} (${esc(x.rank)})</option>`).join("")}</select></div>` : ""}` : `<div class="kv"><span>하위 조직</span><b>${org.children(u).map((c) => esc(c.name)).join(", ") || "없음"}</b></div>`}
           <div class="field"><label for="rm-role">이 방이 하는 업무 (책임자가 이 범위로 업무를 나누고, 팀원 질문에 답합니다)</label>
             <textarea id="rm-role" maxlength="4000" rows="5" placeholder="예) 로컬 플랫폼 기획·운영. 결과물: 기획서·운영 지표. 범위 밖 요청은 비서실에 확인.">${esc(u.role_text || "")}</textarea></div>
-          <div class="kv"><span>사용 AI</span><select id="rm-engine"><option value="openai" ${u.engine === "openai" ? "selected" : ""}>ChatGPT</option><option value="gemini" ${u.engine === "gemini" ? "selected" : ""}>Gemini</option></select></div>
+          <div class="kv"><span>사용 AI</span><select id="rm-engine"><option value="openai" ${u.engine === "openai" ? "selected" : ""}>ChatGPT</option><option value="gemini" ${u.engine === "gemini" ? "selected" : ""}>Gemini</option><option value="claude" ${u.engine === "claude" ? "selected" : ""}>Claude</option></select></div>
           <p class="hint">하루 AI 몫 · 책임자 ${lim(0.05)} 토큰(5%, 규제 없음) · 팀원 각 ${lim(0.10)} 토큰(10%, 한도 적용)</p>
         </div>` : `<p class="hint">조직을 연결하면 이 방의 업무와 책임자가 정해집니다. 아직 조직이 없다면 아래 버튼으로 바로 만드세요.</p>`}
       <div class="room-msg" hidden></div>`;

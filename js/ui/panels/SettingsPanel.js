@@ -1,4 +1,4 @@
-import { show } from "../../util/dom.js?v=202610251204";
+import { show } from "../../util/dom.js?v=202610291137";
 
 /** 설정: the company's own AI keys, profile for ID/password recovery, password, CEO look. */
 export class SettingsPanel {
@@ -10,7 +10,9 @@ export class SettingsPanel {
         <p class="hint">직원들이 이 키로 일합니다. 키는 서버 금고(Vault)에 저장되고 화면에 다시 표시되지 않습니다.</p>
         <div class="key-row"><div class="field"><label for="k-openai">ChatGPT (OpenAI API 키)</label><input id="k-openai" type="password" autocomplete="off" placeholder="sk-…"></div><span class="key-state" id="ks-openai"></span></div>
         <div class="key-row"><div class="field"><label for="k-gemini">Gemini (Google AI Studio 키)</label><input id="k-gemini" type="password" autocomplete="off" placeholder="AIza…"></div><span class="key-state" id="ks-gemini"></span></div>
-        <div class="row-between"><button class="btn small" type="button" data-clear="openai">ChatGPT 키 삭제</button><button class="btn small" type="button" data-clear="gemini">Gemini 키 삭제</button><button class="btn small primary" type="button" id="btn-keys">키 저장</button></div>
+        <div class="key-row"><div class="field"><label for="k-claude">Claude (Anthropic API 키 · platform.claude.com)</label><input id="k-claude" type="password" autocomplete="off" placeholder="sk-ant-…"></div><span class="key-state" id="ks-claude"></span></div>
+        <p class="hint">조직마다 쓸 AI를 고릅니다(방 설정·조직 탭). 그 AI가 실패하면 등록된 다른 AI가 이어서 처리합니다.</p>
+        <div class="row-between wrap"><button class="btn small" type="button" data-clear="openai">ChatGPT 키 삭제</button><button class="btn small" type="button" data-clear="gemini">Gemini 키 삭제</button><button class="btn small" type="button" data-clear="claude">Claude 키 삭제</button><button class="btn small primary" type="button" id="btn-keys">키 저장</button></div>
         <div id="k-msg" hidden></div>
       </section>
       <section class="stack">
@@ -31,7 +33,7 @@ export class SettingsPanel {
         <h3>내 정보</h3>
         <div class="field"><label for="pf-name">이름</label><input id="pf-name" maxlength="30"></div>
         <div class="field"><label for="pf-phone">연락처</label><input id="pf-phone" inputmode="tel"></div>
-        <div class="field"><label for="pf-engine">일일 보고서 정리 AI</label><select id="pf-engine"><option value="openai">ChatGPT</option><option value="gemini">Gemini</option></select></div>
+        <div class="field"><label for="pf-engine">일일 보고서 정리 AI</label><select id="pf-engine"><option value="openai">ChatGPT</option><option value="gemini">Gemini</option><option value="claude">Claude</option></select></div>
         <button class="btn" type="button" id="btn-profile">내 정보 저장</button><div id="pf-msg" hidden></div>
       </section>
       <section class="stack">
@@ -68,6 +70,7 @@ export class SettingsPanel {
     const st = (has) => (has ? `<span class="pill done">등록됨</span>` : `<span class="pill">없음</span>`);
     this.root.querySelector("#ks-openai").innerHTML = st(p.has_openai);
     this.root.querySelector("#ks-gemini").innerHTML = st(p.has_gemini);
+    this.root.querySelector("#ks-claude").innerHTML = st(p.has_claude);
     this.root.querySelector("#cal-state").innerHTML = p.has_google ? `<span class="pill done">연결됨</span>` : `<span class="pill">연결 안 됨</span>`;
     this.root.querySelector("#cal-note").textContent = p.calendar_note ? "최근 시험: " + p.calendar_note.replace(/ · \S+$/, "") : "";
     this.root.querySelector("#btn-cal-test").disabled = !p.has_google;
@@ -80,7 +83,7 @@ export class SettingsPanel {
   async saveKeys() {
     const msg = this.root.querySelector("#k-msg"); const api = this.store.api; let n = 0;
     try {
-      for (const eng of ["openai", "gemini"]) {
+      for (const eng of ["openai", "gemini", "claude"]) {
         const inp = this.root.querySelector("#k-" + eng); const v = inp.value.trim();
         if (v) { await api.setAiKey(eng, v); inp.value = ""; n++; }
       }

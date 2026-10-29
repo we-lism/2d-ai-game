@@ -1,4 +1,4 @@
-import { frag } from "../util/dom.js?v=202610251204";
+import { frag } from "../util/dom.js?v=202610291137";
 
 /** Base dialog: overlay, title, body, footer. Subclasses fill the body. */
 export class Modal {

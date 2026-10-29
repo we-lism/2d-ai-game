@@ -1,4 +1,4 @@
-import { pick, ri } from "../util/random.js?v=202610251204";
+import { pick, ri } from "../util/random.js?v=202610291137";
 
 export const SKINS = ["#f6d7bd", "#eec39f", "#dcaa80", "#c48a5e", "#9a6640", "#6e4528"];
 export const HAIRS = ["#1f1a17", "#3b2a20", "#5a3a22", "#7a5230", "#a37a4f", "#4a4f57", "#c9c3b8", "#8a2f2a"];

@@ -1,6 +1,6 @@
-import { esc, show } from "../../util/dom.js?v=202610251204";
-import { UNIT_TYPES } from "../../model/Organization.js?v=202610251204";
-import { Building } from "../../model/Layout.js?v=202610251204";
+import { esc, show } from "../../util/dom.js?v=202610291137";
+import { UNIT_TYPES } from "../../model/Organization.js?v=202610291137";
+import { Building } from "../../model/Layout.js?v=202610291137";
 
 /**
  * 조직: build 부 › 과 › 팀, put people in teams, appoint heads when the rule allows,
@@ -68,7 +68,7 @@ export class OrgPanel {
         <div class="kv"><span>팀원 추가</span><select data-field="member" aria-label="팀원 추가"><option value="">선택…</option>${addable.map((p) => `<option value="${p.id}">${esc(p.name)}${p.unit_id ? " (" + esc(org.unit(p.unit_id)?.name || "") + ")" : ""}</option>`).join("")}</select></div>
 ` : ""}
       <div class="field"><label>담당 업무 (${T.head}이 이 범위로 업무를 나누고 질문에 답합니다)${room ? ` · 방: ${esc(room)}` : ""}</label><textarea data-field="role" maxlength="4000" placeholder="예) 플랫폼 기획·개발·제휴 영업 담당">${esc(u.role_text)}</textarea></div>
-      <div class="row-between"><select data-field="engine" aria-label="사용 AI"><option value="openai" ${u.engine === "openai" ? "selected" : ""}>ChatGPT</option><option value="gemini" ${u.engine === "gemini" ? "selected" : ""}>Gemini</option></select><button type="button" class="btn small" data-saverole="${u.id}">업무 저장</button></div>
+      <div class="row-between"><select data-field="engine" aria-label="사용 AI"><option value="openai" ${u.engine === "openai" ? "selected" : ""}>ChatGPT</option><option value="gemini" ${u.engine === "gemini" ? "selected" : ""}>Gemini</option><option value="claude" ${u.engine === "claude" ? "selected" : ""}>Claude</option></select><button type="button" class="btn small" data-saverole="${u.id}">업무 저장</button></div>
     </article>`;
   }
 
